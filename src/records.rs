@@ -7,45 +7,52 @@ pub struct Meta {
     pub auto_added: Option<bool>,
     pub source: Option<String>,
 }
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CAAData {
-    pub flags: Option<u8>,
-    pub tag: Option<String>,
-    pub value: Option<String>,
-}
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CERTData {
-    pub algorithm: Option<u8>,
-    pub certificate: Option<String>,
-    pub key_tag: Option<u16>,
-    pub r#type: Option<u16>,
-}
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DNSKEYData {
-    pub algorithm: Option<u8>,
-    pub flags: Option<u16>,
-    pub protocol: Option<u16>,
-    pub public_key: Option<String>,
-}
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DSData {
-    pub algorithm: Option<u8>,
-    pub digest: Option<String>,
-    pub digest_type: Option<u8>,
-    pub key_tag: Option<u16>,
-}
-#[derive(Serialize, Deserialize, Debug)]
-pub struct HTTPSData {
-    pub priority: Option<u16>,
-    pub target: Option<String>,
-    pub value: Option<String>,
+
+mod record_data {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct CAAData {
+        pub flags: Option<u8>,
+        pub tag: Option<String>,
+        pub value: Option<String>,
+    }
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct CERTData {
+        pub algorithm: Option<u8>,
+        pub certificate: Option<String>,
+        pub key_tag: Option<u16>,
+        pub r#type: Option<u16>,
+    }
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct DNSKEYData {
+        pub algorithm: Option<u8>,
+        pub flags: Option<u16>,
+        pub protocol: Option<u16>,
+        pub public_key: Option<String>,
+    }
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct DSData {
+        pub algorithm: Option<u8>,
+        pub digest: Option<String>,
+        pub digest_type: Option<u8>,
+        pub key_tag: Option<u16>,
+    }
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct HTTPSData {
+        pub priority: Option<u16>,
+        pub target: Option<String>,
+        pub value: Option<String>,
+    }
+
+    #[derive(Serialize, Deserialize, Debug)]
+    pub struct URIData {
+        pub content: Option<String>,
+        pub weight: Option<u16>,
+    }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct URIData {
-    pub content: Option<String>,
-    pub weight: Option<u16>,
-}
+use record_data::*;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
