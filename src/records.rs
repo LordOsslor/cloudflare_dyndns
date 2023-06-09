@@ -199,36 +199,6 @@ impl Record for RecordResponse {
     }
 }
 
-// pub struct FreshRecord {
-//     pub type_data: TypeSpecificData,
-//     pub name: MaxLenString<255>,
-//     pub comment: Option<String>,
-//     pub id: Option<MaxLenString<32>>,
-//     pub tags: Option<Vec<String>>,
-//     pub ttl: Option<TTLU32>,
-//     pub zone_id: Option<MaxLenString<32>>,
-// }
-// impl Record for FreshRecord {
-//     fn get_comment(&self) -> &Option<String> {
-//         &self.comment
-//     }
-//     fn get_id(&self) -> &Option<MaxLenString<32>> {
-//         self.id
-//     }
-//     fn get_name(&self) -> MaxLenString<255> {
-//         self.name
-//     }
-//     fn get_tags(&self) -> Option<Vec<String>> {
-//         self.tags
-//     }
-//     fn get_ttl(&self) -> Option<TTLU32> {
-//         self.ttl
-//     }
-//     fn get_type_data(&self) -> &TypeSpecificData {
-//         &self.type_data
-//     }
-// }
-
 #[derive(Deserialize, Debug)]
 pub struct Message {
     pub code: MinMaxValueU16<1000, { u16::MAX }>,
