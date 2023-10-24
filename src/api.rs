@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    config::{self, Authorization},
+    config::{self, Authorization, SearchCriteria},
     records::{ListResponse, PatchResponse, Record, RecordResponse, TypeSpecificData},
 };
 use reqwest::{Method, RequestBuilder, StatusCode};
@@ -19,56 +19,82 @@ fn authenticate_request(req: RequestBuilder, auth: &Authorization) -> RequestBui
     }
 }
 
-pub async fn list_records(
+async fn list_zone_records(
+    client: &reqwest::Client,
     zone: &config::Zone,
-) -> Result<Vec<RecordResponse>, Box<dyn std::error::Error>> {
-    let client = reqwest::Client::new();
+    rule: &SearchCriteria,
+) -> Result<ListResponse, Box<dyn std::error::Error>> {
+    let url = format!(
+        "https://api.cloudflare.com/client/v4/zones/{}/dns_records?{}",
+        zone.identifier.0,
+        serde_url_params::to_string(&rule)?
+    );
 
-    let mut record_vec = Vec::<RecordResponse>::new();
-    for rule in &zone.search {
-        let url = format!(
-            "https://api.cloudflare.com/client/v4/zones/{}/dns_records?{}",
-            zone.identifier.0,
-            serde_url_params::to_string(&rule)?
-        );
+    let mut request = client
+        .request(Method::GET, url)
+        .header("Content-Type", "application/json");
 
-        let mut request = client
-            .request(Method::GET, url)
-            .header("Content-Type", "application/json");
+    request = authenticate_request(request, &zone.auth);
 
-        request = authenticate_request(request, &zone.auth);
+    let response = request.send().await?;
 
-        let response = request.send().await?;
+    let status = response.status();
+    let text = response.text().await?;
 
-        let status = response.status();
-        let text = response.text().await?;
-
-        let mut result: ListResponse = match status {
-            StatusCode::OK => serde_json::from_str(&text)?,
-            code => Err(format!(
-                "Response for list records request is of code: {}\nText: {}",
-                code, text
-            ))?,
-        };
-        println!("{:?}", result);
-        println!("{}", serde_json::to_string_pretty(&result.result).unwrap());
-        record_vec.append(&mut result.result);
-    }
-
-    Ok(record_vec)
+    let result: ListResponse = match status {
+        StatusCode::OK => serde_json::from_str(&text)?,
+        code => Err(format!(
+            "Response for list records request is of code: {}\nText: {}",
+            code, text
+        ))?,
+    };
+    // println!("{:?}", result);
+    // println!("{}", serde_json::to_string_pretty(&result.result).unwrap());
+    Ok(result)
 }
 
-// pub async fn patch_record(
+// pub async fn list_all_matching_zone_records(
 //     zone: &config::Zone,
-//     record: &RecordTypes,
-// ) -> Result<PatchResponse, Box<dyn std::error::Error>> {
+// ) -> Result<Vec<RecordResponse>, Box<dyn std::error::Error>> {
 //     let client = reqwest::Client::new();
-//     let record_id = &record
 
-//     Ok(())
+//     let mut record_vec = Vec::<RecordResponse>::new();
+//     match &zone.search {
+//         Some(rules) => {
+//             for rule in rules {
+//                 let mut response = list_zone_records(&client, zone, &rule).await?;
+//                 record_vec.append(&mut response.result);
+//             }
+//         }
+//         None => {
+//             let mut response = list_zone_records(&client, zone, &SearchCriteria::default()).await?;
+//             record_vec.append(&mut response.result);
+//         }
+//     }
+
+//     Ok(record_vec)
 // }
 
-pub async fn patch_ip_record_address(
+pub async fn patch_all_matching_zone_ip_records(
+    zone: &config::Zone,
+    addresses: (Option<Ipv4Addr>, Option<Ipv6Addr>),
+) -> Result<Vec<PatchResponse>, Box<dyn std::error::Error>> {
+    let responses = list_all_matching_zone_records(zone).await?;
+    let client = reqwest::Client::new();
+    match &zone.search {
+        Some(rules) => for rule in rules {},
+        None => list_zone_records(&client, zone, &SearchCriteria::default()).await?,
+    }
+
+    let mut patch_responses = Vec::<PatchResponse>::new();
+    for record in responses {
+        patch_responses.push(patch_ip_record(zone, Box::new(&record), addresses).await?);
+    }
+
+    Ok(patch_responses)
+}
+
+pub async fn patch_ip_record(
     zone: &config::Zone,
     record: Box<&dyn Record>,
     addresses: (Option<Ipv4Addr>, Option<Ipv6Addr>),
@@ -120,6 +146,31 @@ pub async fn patch_ip_record_address(
             text
         ))?,
     }
+}
+
+pub async fn update_ips(conf: &config::Config) -> Result<(), Box<dyn std::error::Error>> {
+    let ip_addresses =
+        get_ip_addresses(conf.ipv4_service.clone(), conf.ipv6_service.clone()).await?;
+
+    for zone in &conf.zones {
+        let criteria = match &zone.update_ip {
+            None => {
+                vec![
+                    SearchCriteria {
+                        r#type: Some(config::RecordType::A),
+                        ..Default::default()
+                    },
+                    SearchCriteria {
+                        r#type: Some(config::RecordType::AAAA),
+                        ..Default::default()
+                    },
+                ]
+            }
+            Some(criteria) => criteria.to_vec(),
+        };
+    }
+
+    Ok(())
 }
 
 pub async fn get_ip_addresses(

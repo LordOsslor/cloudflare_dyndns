@@ -79,7 +79,7 @@ pub struct Zone {
     pub identifier: MaxLenString<32>,
     pub auth: Authorization,
 
-    pub search: Vec<SearchCriteria>,
+    pub update_ip: Option<Vec<SearchCriteria>>,
 }
 
 #[derive(Serialize, Deserialize)]
