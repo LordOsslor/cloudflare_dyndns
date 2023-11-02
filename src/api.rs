@@ -58,16 +58,6 @@ pub async fn list_records(
     Ok(record_vec)
 }
 
-// pub async fn patch_record(
-//     zone: &config::Zone,
-//     record: &RecordTypes,
-// ) -> Result<PatchResponse, Box<dyn std::error::Error>> {
-//     let client = reqwest::Client::new();
-//     let record_id = &record
-
-//     Ok(())
-// }
-
 pub async fn patch_ip_record_address(
     zone: &config::Zone,
     record: Box<&dyn Record>,
@@ -80,12 +70,18 @@ pub async fn patch_ip_record_address(
     let client = reqwest::Client::new();
 
     let addr = match &record.get_type_data() {
-        TypeSpecificData::A { .. } => match addresses.0 {
-            Some(a) => a.to_string(),
+        TypeSpecificData::A { content, .. } => match addresses.0 {
+            Some(a) => match a.to_string() == *content {
+                true => Err("Ipv4 address unchanged")?,
+                false => a.to_string(),
+            },
             None => Err("No ipv4 address found to patch A record")?,
         },
-        TypeSpecificData::AAAA { .. } => match addresses.1 {
-            Some(a) => a.to_string(),
+        TypeSpecificData::AAAA { content, .. } => match addresses.1 {
+            Some(a) => match a.to_string() == *content {
+                true => Err("Ipv6 address unchanged")?,
+                false => a.to_string(),
+            },
             None => Err("No ipv6 address found to patch AAAA record")?,
         },
         _ => Err("Wrong record type provided")?,
