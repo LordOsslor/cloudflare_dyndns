@@ -50,8 +50,7 @@ pub async fn list_records(
                 code, text
             ))?,
         };
-        println!("{:?}", result);
-        println!("{}", serde_json::to_string_pretty(&result.result).unwrap());
+
         record_vec.append(&mut result.result);
     }
 
