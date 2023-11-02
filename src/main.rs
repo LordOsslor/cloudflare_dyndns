@@ -23,12 +23,17 @@ async fn main() {
     println!("{:?}", x);
 
     for record in &x {
-        let r = api::patch_ip_record_address(conf.zones.first().expect(""), Box::new(record), addr)
-            .await
-            .unwrap();
-        println!("{:?}", r);
-    }
+        let record_name = record.name.to_owned();
+        print!("({record_name}): ");
 
-    let s = serde_json::to_string(&x).unwrap();
-    println!("{}", s);
+        match api::patch_ip_record_address(conf.zones.first().expect(""), Box::new(record), addr)
+            .await
+        {
+            Ok(r) => match r.success {
+                true => println!("Successfully patched record"),
+                false => println!("Patch unsuccessful"),
+            },
+            Err(r) => println!("Error: {r}"),
+        }
+    }
 }
