@@ -17,23 +17,23 @@ async fn main() {
         .unwrap();
     println!("{:?}", addr);
 
-    let x = api::list_records(conf.zones.first().expect("msg"))
-        .await
-        .unwrap();
-    println!("{:?}", x);
+    for zone in conf.zones {
+        let id = zone.identifier.clone();
+        println!("Listing records for zone \"{id}\"");
+        let response_list = api::list_records(&zone).await.unwrap();
 
-    for record in &x {
-        let record_name = record.name.to_owned();
-        print!("({record_name}): ");
+        println!("Received {} responses", response_list.len());
 
-        match api::patch_ip_record_address(conf.zones.first().expect(""), Box::new(record), addr)
-            .await
-        {
-            Ok(r) => match r.success {
-                true => println!("Successfully patched record"),
-                false => println!("Patch unsuccessful"),
-            },
-            Err(r) => println!("Error: {r}"),
+        for record in &response_list {
+            print!("({}): ", record.name);
+
+            match api::patch_ip_record_address(&zone, Box::new(record), addr).await {
+                Ok(r) => match r.success {
+                    true => println!("Successfully patched record"),
+                    false => println!("Patch unsuccessful"),
+                },
+                Err(r) => println!("Error: {r}"),
+            }
         }
     }
 }
