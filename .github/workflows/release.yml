@@ -9,7 +9,7 @@ env:
 
 jobs:
     release:
-      name: Release - ${{ matrix.platform.release_for }}
+      name: Release - ${{ matrix.platform.os_name }}
       strategy:
         matrix:
           platform:
@@ -45,7 +45,7 @@ jobs:
             command: "build"
             target: ${{ matrix.platform.target }}
             toolchain: ${{ matrix.toolchain }}
-            args: "--locked --release"
+            args: "--release"
             strip: true
         - name: Package as archive
           shell: bash
