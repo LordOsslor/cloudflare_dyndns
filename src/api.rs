@@ -128,8 +128,11 @@ pub async fn get_ip_addresses(
     let ipv4_addr = if let Some(ipv4_service_url) = ipv4_service_url {
         let resp4 = reqwest::get(ipv4_service_url).await?;
         match resp4.status() {
-            StatusCode::OK => Some(resp4.text().await?.parse()?),
-            _ => Err("Could not get ipv4 address")?,
+            StatusCode::OK => match resp4.text().await?.parse() {
+                Ok(v) => Some(v),
+                _ => None,
+            },
+            _ => None,
         }
     } else {
         None
@@ -138,8 +141,11 @@ pub async fn get_ip_addresses(
     let ipv6_addr = if let Some(ipv6_service_url) = ipv6_service_url {
         let resp6 = reqwest::get(ipv6_service_url).await?;
         match resp6.status() {
-            StatusCode::OK => Some(resp6.text().await?.parse()?),
-            _ => Err("Could not get ipv6 address")?,
+            StatusCode::OK => match resp6.text().await?.parse() {
+                Ok(v) => Some(v),
+                _ => None,
+            },
+            _ => None,
         }
     } else {
         None
