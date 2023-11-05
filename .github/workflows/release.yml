@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+    release:
+      name: Release - ${{ matrix.platform.release_for }}
+      strategy:
+        matrix:
+          platform:
+            - release_for: Linux-x86_64
+              os: ubuntu-20.04
+              target: x86_64-unknown-linux-gnu
+              bin: dyndns
+              name: dyndns-Linux-x86_64.tar.gz
+              command: build
+  
+            - release_for: Windows-x86_64
+              os: windows-latest
+              target: x86_64-pc-windows-msvc
+              bin: dyndns.exe
+              name: dyndns-Windows-x86_64.zip
+              command: both
+  
+            - release_for: macOS-x86_64
+              os: macOS-latest
+              target: x86_64-apple-darwin
+              bin: dyndns
+              name: dyndns-Darwin-x86_64.tar.gz
+              command: both
+  
+  
+      runs-on: ${{ matrix.platform.os }}
+      steps:    
+        - name: Checkout
+          uses: actions/checkout@v3
+        - name: Cache cargo & target directories
+          uses: Swatinem/rust-cache@v2
+        - name: Build binary
+          uses: houseabsolute/actions-rust-cross@v0
+          with:
+            command: ${{ matrix.platform.command }}
+            target: ${{ matrix.platform.target }}
+            args: "--locked --release"
+            strip: true
+            name: Package as archive
+            shell: bash
+            run: |
+              cd target/${{ matrix.platform.target }}/release
+              if [[ "${{ matrix.platform.os }}" == "windows-latest" ]]; then
+                7z a ../../../${{ matrix.platform.name }} ${{ matrix.platform.bin }}
+              else
+                tar czvf ../../../${{ matrix.platform.name }} ${{ matrix.platform.bin }}
+              fi
+              cd -
+            if: |
+              matrix.toolchain == 'stable' &&
+              ( startsWith( github.ref, 'refs/tags/v' ) ||
+                github.ref == 'refs/tags/test-release' )
+        - name: Publish release artifacts
+          uses: actions/upload-artifact@v3
+          with:
+            name: dyndns-${{ matrix.platform.os_name }}
+            path: "dyndns-*"
