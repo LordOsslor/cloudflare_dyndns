@@ -7,11 +7,11 @@ mod records;
 
 #[tokio::main]
 async fn main() {
-    let mut x = File::open("config.toml").unwrap();
-    let mut s = String::new();
-    x.read_to_string(&mut s).unwrap();
+    let mut config_file = File::open("config.toml").unwrap();
+    let mut config_string = String::new();
+    config_file.read_to_string(&mut config_string).unwrap();
 
-    let conf: config::Config = toml::from_str(&s).unwrap();
+    let conf: config::Config = toml::from_str(&config_string).unwrap();
     let addr = api::get_ip_addresses(conf.ipv4_service, conf.ipv6_service)
         .await
         .unwrap();
