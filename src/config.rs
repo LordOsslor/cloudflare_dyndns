@@ -59,18 +59,23 @@ pub enum RecordType {
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct SearchCriteria {
+    #[serde(flatten)]
     pub comment: Option<StringMatch>,
     pub content: Option<String>,
+    #[serde(flatten)]
     pub direction: Option<Direction>,
+    #[serde(flatten)]
     pub r#match: Option<Match>,
     pub name: Option<MaxLenString<255>>,
+    #[serde(flatten)]
     pub order: Option<Order>,
     pub page: Option<MinMaxValueU16<1, { u16::MAX }>>,
     pub per_page: Option<MinMaxValueU16<5, 50000>>,
     pub proxied: Option<bool>,
     pub search: Option<String>,
+    #[serde(flatten)]
     pub tag: Option<StringMatch>,
-    pub tag_match: Option<Match>,
+    pub tag_match: Option<String>,
     pub r#type: Option<RecordType>,
 }
 
