@@ -1,4 +1,7 @@
-use std::{fs::File, io::Read};
+use std::{fs::File, io::Read, sync::Arc};
+
+use crate::records::Record;
+use futures::future::join_all;
 
 mod api;
 mod config;
@@ -24,16 +27,25 @@ async fn main() {
 
         println!("Received {} responses", response_list.len());
 
-        for record in &response_list {
-            print!("({}): ", record.name);
+        let zone_arc = Arc::new(zone);
 
-            match api::patch_ip_record_address(&zone, Box::new(record), addr).await {
-                Ok(r) => match r.success {
-                    true => println!("Successfully patched record"),
-                    false => println!("Patch unsuccessful"),
-                },
-                Err(r) => println!("Error: {r}"),
-            }
+        let mut futures = Vec::with_capacity(response_list.len());
+
+        for record in response_list {
+            let record_arc: Arc<(dyn Record + Send + Sync)> = Arc::new(record);
+            let zone_arc_2 = zone_arc.clone();
+
+            futures.push(tokio::spawn(async move {
+                let record_name = record_arc.get_name();
+                match api::patch_ip_record_address(zone_arc_2, record_arc.clone(), addr).await {
+                    Ok(r) => match r.success {
+                        true => println!("({}): Successfully patched record", record_name),
+                        false => println!("({}): Patch unsuccessful", record_name),
+                    },
+                    Err(r) => println!("({}): Error: {}", record_name, r),
+                }
+            }));
         }
+        join_all(futures).await;
     }
 }

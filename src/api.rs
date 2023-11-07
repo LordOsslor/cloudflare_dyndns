@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     net::{Ipv4Addr, Ipv6Addr},
+    sync::Arc,
 };
 
 use crate::{
@@ -58,10 +59,10 @@ pub async fn list_records(
 }
 
 pub async fn patch_ip_record_address(
-    zone: &config::Zone,
-    record: Box<&dyn Record>,
+    zone: Arc<config::Zone>,
+    record: Arc<dyn Record + Send + Sync>,
     addresses: (Option<Ipv4Addr>, Option<Ipv6Addr>),
-) -> Result<PatchResponse, Box<dyn std::error::Error>> {
+) -> Result<PatchResponse, Box<dyn std::error::Error + Send + Sync>> {
     if addresses.0.is_none() && addresses.0.is_none() {
         Err("No addresses provided")?
     }
