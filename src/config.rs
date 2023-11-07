@@ -1,8 +1,9 @@
 use crate::misc_serialization::*;
 
 use serde::{Deserialize, Serialize};
+use serde_with::with_prefix;
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 pub struct StringMatch {
     pub exact: Option<String>,
     pub absent: Option<bool>,
@@ -12,20 +13,20 @@ pub struct StringMatch {
     pub startswith: Option<String>,
 }
 #[allow(non_camel_case_types)]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Direction {
     asc,
     desc,
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Match {
     any,
     all,
 }
 #[allow(non_camel_case_types)]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Order {
     r#type,
     name,
@@ -33,7 +34,7 @@ pub enum Order {
     ttl,
     proxied,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum RecordType {
     A,
     AAAA,
@@ -57,27 +58,33 @@ pub enum RecordType {
     URI,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 pub struct SearchCriteria {
-    #[serde(flatten)]
+    #[serde(flatten, with = "prefix_comment")]
     pub comment: Option<StringMatch>,
     pub content: Option<String>,
-    #[serde(flatten)]
+    #[serde(flatten, with = "prefix_direction")]
     pub direction: Option<Direction>,
-    #[serde(flatten)]
+    #[serde(flatten, with = "prefix_match")]
     pub r#match: Option<Match>,
     pub name: Option<MaxLenString<255>>,
-    #[serde(flatten)]
+    #[serde(flatten, with = "prefix_order")]
     pub order: Option<Order>,
     pub page: Option<MinMaxValueU16<1, { u16::MAX }>>,
     pub per_page: Option<MinMaxValueU16<5, 50000>>,
     pub proxied: Option<bool>,
     pub search: Option<String>,
-    #[serde(flatten)]
+    #[serde(flatten, with = "prefix_tag")]
     pub tag: Option<StringMatch>,
     pub tag_match: Option<String>,
     pub r#type: Option<RecordType>,
 }
+
+with_prefix!(prefix_comment "comment.");
+with_prefix!(prefix_direction "direction.");
+with_prefix!(prefix_match "match.");
+with_prefix!(prefix_order "order.");
+with_prefix!(prefix_tag "tag.");
 
 #[derive(Serialize, Deserialize)]
 pub struct Zone {
