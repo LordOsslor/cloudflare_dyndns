@@ -44,7 +44,7 @@ jobs:
             command: "build"
             target: ${{ matrix.platform.target }}
             toolchain: ${{ matrix.toolchain }}
-            args: "--release"
+            args: "--release --features update"
             strip: true
         - name: Package as archive
           shell: bash
