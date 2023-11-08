@@ -3,6 +3,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::env::current_exe;
 use std::error::Error;
+#[cfg(target_family = "unix")]
 use std::os::unix::prelude::PermissionsExt;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::AsyncWriteExt;
