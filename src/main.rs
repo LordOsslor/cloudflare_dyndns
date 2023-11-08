@@ -8,8 +8,16 @@ mod config;
 mod misc_serialization;
 mod records;
 
+pub mod built_info {
+    // The file has been placed there by the build script.
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
+
 #[tokio::main]
 async fn main() {
+    println!("{:?}", built_info::GIT_HEAD_REF);
+    println!("{:?}", built_info::GIT_VERSION);
+    return;
     let mut config_file = File::open("config.toml").unwrap();
     let mut config_string = String::new();
     config_file.read_to_string(&mut config_string).unwrap();
