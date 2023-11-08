@@ -86,7 +86,12 @@ pub async fn update_if_not_latest_release(tag: &str) -> Result<std::path::PathBu
         Err(format!("Already at most recent tag ({})", tag))?
     }
 
-    println!("There is a new release. Trying to find matching binary");
+    println!(
+        "Latest release: {} ({}), Installed version: {}",
+        release.tag_name, release.name, tag
+    );
+
+    println!("Trying to get binary from latest release");
 
     let asset = release.get_matching_asset().ok_or_else(|| {
         format!(
