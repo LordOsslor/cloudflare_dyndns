@@ -22,6 +22,7 @@ async fn main() {
     match built_info::GIT_VERSION {
         Some(version) => match update::update_if_not_latest_release(version).await {
             Ok(exe_path) => {
+                println!("Starting new binary");
                 Command::new(exe_path)
                     .args(std::env::args())
                     .arg("--just-updated")

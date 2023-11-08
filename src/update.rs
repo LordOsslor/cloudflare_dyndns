@@ -75,6 +75,8 @@ async fn get_latest_release(client: &Client) -> Result<Release, reqwest::Error> 
 }
 
 pub async fn update_if_not_latest_release(tag: &str) -> Result<std::path::PathBuf, Box<dyn Error>> {
+    println!("Checking for new release");
+
     let client = Client::new();
 
     let release = get_latest_release(&client).await?;
@@ -83,13 +85,16 @@ pub async fn update_if_not_latest_release(tag: &str) -> Result<std::path::PathBu
         Err(format!("Already at most recent tag ({})", tag))?
     }
 
+    println!("There is a new release. Trying to find matching binary");
+
     let asset = release.get_matching_asset().ok_or_else(|| {
         format!(
-            "No matching asset could be found for target {} in release for tag {}",
+            "No matching binary could be found for target {} in release for tag {}",
             TARGET, release.tag_name
         )
     })?;
 
+    println!("Removing current binary");
     let exe_path = current_exe()?;
     tokio::fs::remove_file(&exe_path).await?;
 
@@ -101,10 +106,12 @@ pub async fn update_if_not_latest_release(tag: &str) -> Result<std::path::PathBu
 
     #[cfg(target_family = "unix")]
     {
+        println!("Setting unix file permissions");
         file.set_permissions(PermissionsExt::from_mode(0o744))
             .await?;
     }
 
+    println!("Downloading new binary");
     asset.download(&mut file, &client).await?;
 
     Ok(exe_path)
