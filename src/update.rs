@@ -100,9 +100,17 @@ pub async fn update_if_not_latest_release(tag: &str) -> Result<std::path::PathBu
         )
     })?;
 
-    println!("Removing current binary");
     let exe_path = current_exe()?;
-    tokio::fs::remove_file(&exe_path).await?;
+    #[cfg(target_family = "unix")]
+    {
+        println!("Removing current binary");
+        tokio::fs::remove_file(&exe_path).await?;
+    }
+    #[cfg(target_family = "windows")]
+    {
+        println!("Renaming current binary (.old)");
+        tokio::fs::rename(&exe_path, &exe_path.with_extension("old")).await?;
+    }
 
     let mut file = OpenOptions::new()
         .create(true)
