@@ -46,7 +46,7 @@ jobs:
             toolchain: ${{ matrix.toolchain }}
             args: "--release --features update"
             strip: true
-        - name: Package as archive
+        - name: Move binary to root folder
           shell: bash
           run: |
             cp target/${{matrix.platform.target}}/release/dyndns${{matrix.platform.ext}} dyndns-${{matrix.platform.target}}${{matrix.platform.ext}}
