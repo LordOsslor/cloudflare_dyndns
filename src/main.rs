@@ -1,12 +1,15 @@
-use std::{fs::File, io::Read, sync::Arc};
-
 use crate::records::Record;
 use futures::future::join_all;
+#[cfg(feature = "update")]
+use std::process::Command;
+use std::{fs::File, io::Read, sync::Arc};
 
 mod api;
 mod config;
 mod misc_serialization;
 mod records;
+#[cfg(feature = "update")]
+mod update;
 
 pub mod built_info {
     // The file has been placed there by the build script.
@@ -15,9 +18,23 @@ pub mod built_info {
 
 #[tokio::main]
 async fn main() {
-    println!("{:?}", built_info::GIT_HEAD_REF);
-    println!("{:?}", built_info::GIT_VERSION);
-    return;
+    #[cfg(feature = "update")]
+    match built_info::GIT_VERSION {
+        Some(version) => match update::update_if_not_latest_release(version).await {
+            Ok(exe_path) => {
+                Command::new(exe_path)
+                    .args(std::env::args())
+                    .arg("--just-updated")
+                    .envs(std::env::vars())
+                    .spawn()
+                    .unwrap();
+                std::process::exit(0);
+            }
+            Err(e) => println!("Error while automatically updating: {e}"),
+        },
+        None => println!("Could not find Git version"),
+    }
+
     let mut config_file = File::open("config.toml").unwrap();
     let mut config_string = String::new();
     config_file.read_to_string(&mut config_string).unwrap();
