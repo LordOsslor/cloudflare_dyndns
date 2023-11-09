@@ -3,6 +3,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::env::current_exe;
 use std::error::Error;
+use std::ffi::OsStr;
 #[cfg(target_family = "unix")]
 use std::os::unix::prelude::PermissionsExt;
 use std::process::Command;
@@ -228,7 +229,7 @@ pub async fn try_update() {
 
     log::info!("Spawning new process from newly downloaded executable");
     match Command::new(exe_path)
-        .args(std::env::args())
+        .args(std::env::args().skip(1))
         .arg("--just-updated")
         .envs(std::env::vars())
         .spawn()
