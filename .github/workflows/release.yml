@@ -10,7 +10,7 @@ env:
 
 jobs:
     release:
-      name: Release - ${{ matrix.platform.os_name }}
+      name: Release - ${{ matrix.platform.os_name }} (${{matrix.feature.name}})
       strategy:
         matrix:
           platform:
@@ -32,6 +32,15 @@ jobs:
           toolchain:
             - stable
 
+          feature:
+            - name: default
+              modifier:
+              arg: --features default
+            - name: no default features
+              modifier: -no_default
+              arg: --no-default-features
+
+
       runs-on: ${{ matrix.platform.os }}
       steps:    
         - name: Checkout
@@ -44,12 +53,12 @@ jobs:
             command: "build"
             target: ${{ matrix.platform.target }}
             toolchain: ${{ matrix.toolchain }}
-            args: "--release --features update"
+            args: "--release ${{matrix.feature.arg}}"
             strip: true
         - name: Move binary to root folder
           shell: bash
           run: |
-            cp target/${{matrix.platform.target}}/release/dyndns${{matrix.platform.ext}} dyndns-${{matrix.platform.target}}${{matrix.platform.ext}}
+            cp target/${{matrix.platform.target}}/release/dyndns${{matrix.platform.ext}} dyndns${{matrix.feature.modifier}}-${{matrix.platform.target}}${{matrix.platform.ext}}
         - name: Release
           uses: softprops/action-gh-release@v1
           with:

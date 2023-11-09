@@ -56,7 +56,12 @@ impl Release {
 
     fn get_matching_asset(&self) -> Option<&Asset> {
         for asset in &self.assets {
-            if asset.name.contains(TARGET) {
+            let asset_feature_and_target = asset
+                .name
+                .trim_end_matches(".exe")
+                .trim_start_matches("dyndns-");
+
+            if asset_feature_and_target == TARGET {
                 return Some(asset);
             }
         }
