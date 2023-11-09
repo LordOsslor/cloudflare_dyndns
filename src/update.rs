@@ -5,10 +5,11 @@ use std::env::current_exe;
 use std::error::Error;
 #[cfg(target_family = "unix")]
 use std::os::unix::prelude::PermissionsExt;
+use std::process::Command;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::AsyncWriteExt;
 
-use crate::built_info::TARGET;
+use crate::built_info;
 
 const REPO_OWNER: &str = "LordOsslor";
 const REPO_NAME: &str = "dyndns";
@@ -61,7 +62,7 @@ impl Release {
                 .trim_end_matches(".exe")
                 .trim_start_matches("dyndns-");
 
-            if asset_feature_and_target == TARGET {
+            if asset_feature_and_target == built_info::TARGET {
                 return Some(asset);
             }
         }
@@ -80,7 +81,26 @@ async fn get_latest_release(client: &Client) -> Result<Release, reqwest::Error> 
         .await
 }
 
-pub async fn update_if_not_latest_release(tag: &str) -> Result<std::path::PathBuf, Box<dyn Error>> {
+pub async fn try_update() {
+    match built_info::GIT_VERSION {
+        Some(version) => match update_if_not_latest_release(version).await {
+            Ok(exe_path) => {
+                println!("Starting new binary");
+                Command::new(exe_path)
+                    .args(std::env::args())
+                    .arg("--just-updated")
+                    .envs(std::env::vars())
+                    .spawn()
+                    .unwrap();
+                std::process::exit(0);
+            }
+            Err(e) => println!("Error while automatically updating: {e}"),
+        },
+        None => println!("Could not find Git version"),
+    }
+}
+
+async fn update_if_not_latest_release(tag: &str) -> Result<std::path::PathBuf, Box<dyn Error>> {
     println!("Checking for new release");
 
     let client = Client::new();
@@ -106,7 +126,8 @@ pub async fn update_if_not_latest_release(tag: &str) -> Result<std::path::PathBu
     let asset = release.get_matching_asset().ok_or_else(|| {
         format!(
             "No matching binary could be found for target {} in release for tag {}",
-            TARGET, release.tag_name
+            built_info::TARGET,
+            release.tag_name
         )
     })?;
 

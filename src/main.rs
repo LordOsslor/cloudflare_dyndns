@@ -1,7 +1,6 @@
 use crate::records::Record;
 use futures::future::join_all;
-#[cfg(feature = "update")]
-use std::process::Command;
+
 use std::{fs::File, io::Read, sync::Arc};
 
 mod api;
@@ -19,22 +18,7 @@ pub mod built_info {
 #[tokio::main]
 async fn main() {
     #[cfg(feature = "update")]
-    match built_info::GIT_VERSION {
-        Some(version) => match update::update_if_not_latest_release(version).await {
-            Ok(exe_path) => {
-                println!("Starting new binary");
-                Command::new(exe_path)
-                    .args(std::env::args())
-                    .arg("--just-updated")
-                    .envs(std::env::vars())
-                    .spawn()
-                    .unwrap();
-                std::process::exit(0);
-            }
-            Err(e) => println!("Error while automatically updating: {e}"),
-        },
-        None => println!("Could not find Git version"),
-    }
+    update::try_update().await;
 
     let mut config_file = File::open("config.toml").unwrap();
     let mut config_string = String::new();
