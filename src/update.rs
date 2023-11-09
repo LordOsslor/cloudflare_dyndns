@@ -3,7 +3,6 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::env::current_exe;
 use std::error::Error;
-use std::ffi::OsStr;
 #[cfg(target_family = "unix")]
 use std::os::unix::prelude::PermissionsExt;
 use std::process::Command;
