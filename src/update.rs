@@ -178,53 +178,55 @@ pub async fn try_update() {
         };
     }
 
-    log::info!("Creating new file in place of the old executable");
-    let mut file = match OpenOptions::new()
-        .create(true)
-        .write(true)
-        .open(&exe_path)
-        .await
     {
-        Ok(file) => {
-            log::info!("Successfully created file");
-            file
-        }
-        Err(e) => {
-            log::error!(
-                "Error while creating file in place of the old executable: {}",
-                e
-            );
-            return;
-        }
-    };
-
-    #[cfg(target_family = "unix")]
-    {
-        log::info!("(Unix only): Setting unix file permissions");
-        match file.set_permissions(PermissionsExt::from_mode(0o744)).await {
-            Ok(_) => log::info!("Successfully set file permissions"),
+        log::info!("Creating new file in place of the old executable");
+        let mut file = match OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&exe_path)
+            .await
+        {
+            Ok(file) => {
+                log::info!("Successfully created file");
+                file
+            }
             Err(e) => {
                 log::error!(
-                    "Error while setting unix file permissions for new executable: {}",
+                    "Error while creating file in place of the old executable: {}",
                     e
                 );
                 return;
             }
         };
-    }
 
-    log::info!(
-        "Downloading executable into new file from {}",
-        asset.browser_download_url
-    );
-
-    match asset.download(&mut file, &client).await {
-        Ok(_) => log::info!("Successfully downloaded executable"),
-        Err(e) => {
-            log::error!("Error while downloading new executable: {}", e);
-            return;
+        #[cfg(target_family = "unix")]
+        {
+            log::info!("(Unix only): Setting unix file permissions");
+            match file.set_permissions(PermissionsExt::from_mode(0o744)).await {
+                Ok(_) => log::info!("Successfully set file permissions"),
+                Err(e) => {
+                    log::error!(
+                        "Error while setting unix file permissions for new executable: {}",
+                        e
+                    );
+                    return;
+                }
+            };
         }
-    };
+
+        log::info!(
+            "Downloading executable into new file from {}",
+            asset.browser_download_url
+        );
+
+        match asset.download(&mut file, &client).await {
+            Ok(_) => log::info!("Successfully downloaded executable"),
+            Err(e) => {
+                log::error!("Error while downloading new executable: {}", e);
+                return;
+            }
+        };
+    }
 
     log::info!("Spawning new process from newly downloaded executable");
     match Command::new(exe_path)
