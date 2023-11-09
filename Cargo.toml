@@ -6,6 +6,7 @@ build = "build.rs"
 authors = ["LordOsslor"]
 
 [features]
+default = ["update"]
 update = []
 
 [build-dependencies]
