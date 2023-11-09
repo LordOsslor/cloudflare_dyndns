@@ -1,9 +1,8 @@
-use crate::records::Record;
 use clap::Parser;
 use core::panic;
-use futures::future::join_all;
 use simple_logger::SimpleLogger;
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -90,46 +89,13 @@ async fn main() {
 
     log::info!("Got {}", api::address_tuple_to_string(addr));
 
-        log::info!("(\"{id}\"): Listing records");
-        let response_list = match api::list_records(&zone).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("Could not list records for zone \"{}\": {}", id, e);
-                continue;
-            }
+    let client = Arc::new(reqwest::Client::new());
+
+    for zone in conf.zones {
+        let id = &zone.identifier.clone();
+        match api::patch_zone(zone, client.clone(), addr).await {
+            Ok(i) => log::info!("\"{id}\": Patched {i} records"),
+            Err(e) => log::error!("\"{id}\": Fatal error while patching records: {e}"),
         };
-
-        log::info!("(\"{id}\"): Received {} responses", response_list.len());
-        log::debug!("(\"{id}\"): Responses: {:?}", response_list);
-
-        let zone_arc = Arc::new(zone);
-
-        let mut futures = Vec::with_capacity(response_list.len());
-
-        log::info!("(\"{id}\"): Patching records");
-        for record in response_list {
-            let record_arc: Arc<(dyn Record + Send + Sync)> = Arc::new(record);
-            let zone_arc_2 = zone_arc.clone();
-
-            futures.push(tokio::spawn(async move {
-                let record_name = record_arc.get_name();
-                let id = &zone_arc_2.identifier;
-                match api::patch_ip_record_address(zone_arc_2.clone(), record_arc.clone(), addr)
-                    .await
-                {
-                    Ok(response) => match response.success {
-                        true => {
-                            log::info!("(\"{id}\"): ({record_name}): Successfully patched record")
-                        }
-                        false => log::error!(
-                            "(\"{id}\"): ({record_name}): Patch unsuccessful: {:#?}",
-                            response.messages
-                        ),
-                    },
-                    Err(e) => log::error!("(\"{id}\"): ({record_name}): {}", e),
-                }
-            }));
-        }
-        join_all(futures).await;
     }
 }
