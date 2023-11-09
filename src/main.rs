@@ -49,7 +49,13 @@ async fn main() {
         }
     }
 
-    log::info!("Opening config file");
+    log::info!(
+        "Opening config file at {}",
+        match cli.config.to_str() {
+            Some(v) => v,
+            None => "(Non utf-8 string)",
+        }
+    );
     let mut config_file = match File::open(cli.config).await {
         Ok(file) => file,
         Err(e) => panic!("Could not open config file {}", e),
@@ -60,11 +66,21 @@ async fn main() {
         Err(e) => panic!("Could not read config file: {}", e),
     };
 
-    log::info!("Parsing config file");
     let conf: config::Config = match toml::from_str(&config_string) {
         Ok(v) => v,
         Err(e) => panic!("Could not parse config file: {}", e),
     };
+
+    let mut total_search_fields = 0;
+    for zone in &conf.zones {
+        total_search_fields += zone.search.len()
+    }
+
+    log::info!(
+        "Found configurations for {} zones with {} total search fields",
+        &conf.zones.len(),
+        total_search_fields
+    );
 
     log::info!("Getting ip addresses");
     let addr = match api::get_ip_addresses(conf.ipv4_service, conf.ipv6_service).await {
@@ -72,8 +88,7 @@ async fn main() {
         Err(e) => panic!("Could not get ip addresses: {}", e),
     };
 
-    for zone in conf.zones {
-        let id = zone.identifier.clone();
+    log::info!("Got {}", api::address_tuple_to_string(addr));
 
         log::info!("(\"{id}\"): Listing records");
         let response_list = match api::list_records(&zone).await {

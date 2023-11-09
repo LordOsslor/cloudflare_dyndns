@@ -70,21 +70,15 @@ pub async fn patch_ip_record_address(
     let client = reqwest::Client::new();
 
     let addr = match &record.get_type_data() {
-        TypeSpecificData::A { content, .. } => match addresses.0 {
-            Some(a) => match a.to_string() == *content {
-                true => Err("Ipv4 address unchanged")?,
-                false => a.to_string(),
-            },
+        TypeSpecificData::A { .. } => match addresses.0 {
+            Some(a) => a.to_string(),
             None => Err("No ipv4 address found to patch A record")?,
         },
-        TypeSpecificData::AAAA { content, .. } => match addresses.1 {
-            Some(a) => match a.to_string() == *content {
-                true => Err("Ipv6 address unchanged")?,
-                false => a.to_string(),
-            },
+        TypeSpecificData::AAAA { .. } => match addresses.1 {
+            Some(a) => a.to_string(),
             None => Err("No ipv6 address found to patch AAAA record")?,
         },
-        _ => Err("Wrong record type provided")?,
+        _ => Err("Provided record is not an ip record")?,
     };
 
     let record_id = match record.get_id() {
@@ -115,6 +109,20 @@ pub async fn patch_ip_record_address(
             &record.get_name().0,
             text
         ))?,
+    }
+}
+pub fn address_tuple_to_string(addresses: (Option<Ipv4Addr>, Option<Ipv6Addr>)) -> String {
+    match addresses {
+        (None, None) => "no addresses".to_owned(),
+        (None, Some(v6)) => format!("{} (IPv6)", v6.to_string()),
+        (Some(v4), None) => format!("{} (IPv4)", v4.to_string()),
+        (Some(v4), Some(v6)) => {
+            format!(
+                "both {} (IPv4) and {} (IPv6)",
+                v4.to_string(),
+                v6.to_string()
+            )
+        }
     }
 }
 
