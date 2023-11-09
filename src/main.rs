@@ -25,6 +25,9 @@ struct CliArgs {
     #[cfg(feature = "update")]
     #[arg(short, long)]
     update: bool,
+    #[cfg(feature = "update")]
+    #[arg(long)]
+    just_updated: bool,
 }
 
 #[tokio::main]
