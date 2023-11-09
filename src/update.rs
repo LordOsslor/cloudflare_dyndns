@@ -51,7 +51,7 @@ struct Release {
 }
 impl Release {
     fn tag_differs(&self, tag: &str) -> bool {
-        self.tag_name != tag
+        !tag.contains(&self.tag_name)
     }
 
     fn get_matching_asset(&self) -> Option<&Asset> {
@@ -82,14 +82,19 @@ pub async fn update_if_not_latest_release(tag: &str) -> Result<std::path::PathBu
 
     let release = get_latest_release(&client).await?;
 
-    if !release.tag_differs(tag) {
-        Err(format!("Already at most recent tag ({})", tag))?
-    }
-
     println!(
-        "Latest release: {} ({}), Installed version: {}",
-        release.tag_name, release.name, tag
+        "Latest release: {}, Installed version: {}, Differs: {}",
+        release.tag_name,
+        tag,
+        release.tag_differs(tag)
     );
+
+    if !release.tag_differs(tag) {
+        Err(format!(
+            "Already at most recent tag ({} ~= {})",
+            release.tag_name, tag
+        ))?
+    }
 
     println!("Trying to get binary from latest release");
 
