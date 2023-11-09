@@ -51,8 +51,8 @@ struct Release {
     assets: Vec<Asset>,
 }
 impl Release {
-    fn tag_differs(&self, tag: &str) -> bool {
-        !tag.contains(&self.tag_name)
+    fn tag_matches(&self, tag: &str) -> bool {
+        tag.contains(&self.tag_name)
     }
 
     fn get_matching_asset(&self) -> Option<&Asset> {
@@ -71,6 +71,7 @@ impl Release {
 }
 
 async fn get_latest_release(client: &Client) -> Result<Release, reqwest::Error> {
+    log::debug!("github latest release url: {}", GITHUB_LATEST_RELEASE_URL);
     client
         .get(GITHUB_LATEST_RELEASE_URL)
         .header("User-Agent", "request")
@@ -82,82 +83,168 @@ async fn get_latest_release(client: &Client) -> Result<Release, reqwest::Error> 
 }
 
 pub async fn try_update() {
-    match built_info::GIT_VERSION {
-        Some(version) => match update_if_not_latest_release(version).await {
-            Ok(exe_path) => {
-                println!("Starting new binary");
-                Command::new(exe_path)
-                    .args(std::env::args())
-                    .arg("--just-updated")
-                    .envs(std::env::vars())
-                    .spawn()
-                    .unwrap();
-                std::process::exit(0);
-            }
-            Err(e) => println!("Error while automatically updating: {e}"),
-        },
-        None => println!("Could not find Git version"),
-    }
-}
-
-async fn update_if_not_latest_release(tag: &str) -> Result<std::path::PathBuf, Box<dyn Error>> {
-    println!("Checking for new release");
+    let version = match built_info::GIT_VERSION {
+        Some(version) => version,
+        None => {
+            log::warn!("Could not get git version from current build metadata");
+            return;
+        }
+    };
 
     let client = Client::new();
 
-    let release = get_latest_release(&client).await?;
-
-    println!(
-        "Latest release: {}, Installed version: {}, Differs: {}",
-        release.tag_name,
-        tag,
-        release.tag_differs(tag)
-    );
-
-    if !release.tag_differs(tag) {
-        Err(format!(
-            "Already at most recent tag ({} ~= {})",
-            release.tag_name, tag
-        ))?
+    log::info!("Getting latest release from github");
+    let release = match get_latest_release(&client).await {
+        Ok(release) => {
+            log::info!("Got release {}", release.name);
+            log::debug!("Full parsed release data: {:?}", release);
+            release
+        }
+        Err(e) => {
+            log::error!(
+                "Encountered an error while getting latest release from github: {}",
+                e
+            );
+            return;
+        }
+    };
+    if release.tag_matches(&version) {
+        log::info!(
+            "Already at latest release tag: {} ~= {}",
+            release.tag_name,
+            version
+        );
+        return;
     }
 
-    println!("Trying to get binary from latest release");
+    log::info!(
+        "Release tag and current tag do not match: {} ~/= {}",
+        release.tag_name,
+        version
+    );
+    log::info!("Getting matching executable asset from release");
 
-    let asset = release.get_matching_asset().ok_or_else(|| {
-        format!(
-            "No matching binary could be found for target {} in release for tag {}",
-            built_info::TARGET,
-            release.tag_name
-        )
-    })?;
+    let asset = match release.get_matching_asset() {
+        Some(asset) => {
+            log::info!("Found asset {}", asset.name);
+            log::debug!("Full parsed asset data: {:?}", asset);
+            asset
+        }
+        None => {
+            log::warn!("Could not find a matching executable asset from latest release");
+            return;
+        }
+    };
 
-    let exe_path = current_exe()?;
+    log::info!("Getting current executable path");
+    let exe_path = match current_exe() {
+        Ok(path) => {
+            log::info!(
+                "Got executable path {}",
+                match path.to_str() {
+                    Some(p) => p,
+                    None => "COULD NOT DISPLAY PATH",
+                }
+            );
+            path
+        }
+        Err(e) => {
+            log::error!("Error while getting current executable path: {}", e);
+            return;
+        }
+    };
+
     #[cfg(target_family = "unix")]
     {
-        println!("Removing current binary");
-        tokio::fs::remove_file(&exe_path).await?;
+        log::info!("(Unix only): Removing current executable");
+        match tokio::fs::remove_file(&exe_path).await {
+            Ok(_) => log::info!("Successfully removed executable"),
+            Err(e) => {
+                log::error!("Error while removing current executable: {}", e);
+                return;
+            }
+        };
     }
     #[cfg(target_family = "windows")]
     {
-        println!("Renaming current binary (.old)");
-        tokio::fs::rename(&exe_path, &exe_path.with_extension("old")).await?;
+        log::info!("(Windows only): Renaming current executable");
+
+        match tokio::fs::rename(&exe_path, &exe_path.with_extension("old")).await {
+            Ok(_) => log::info!("Successfully renamed executable"),
+            Err(e) => {
+                log::error!("Error while renaming current executable: {}", e);
+                return;
+            }
+        };
     }
 
-    let mut file = OpenOptions::new()
+    log::info!("Creating new file in place of the old executable");
+    let mut file = match OpenOptions::new()
         .create(true)
         .write(true)
         .open(&exe_path)
-        .await?;
+        .await
+    {
+        Ok(file) => {
+            log::info!("Successfully created file");
+            file
+        }
+        Err(e) => {
+            log::error!(
+                "Error while creating file in place of the old executable: {}",
+                e
+            );
+            return;
+        }
+    };
 
     #[cfg(target_family = "unix")]
     {
-        println!("Setting unix file permissions");
-        file.set_permissions(PermissionsExt::from_mode(0o744))
-            .await?;
+        log::info!("(Unix only): Setting unix file permissions");
+        match file.set_permissions(PermissionsExt::from_mode(0o744)).await {
+            Ok(_) => log::info!("Successfully set file permissions"),
+            Err(e) => {
+                log::error!(
+                    "Error while setting unix file permissions for new executable: {}",
+                    e
+                );
+                return;
+            }
+        };
     }
 
-    println!("Downloading new binary");
-    asset.download(&mut file, &client).await?;
+    log::info!(
+        "Downloading executable into new file from {}",
+        asset.browser_download_url
+    );
 
-    Ok(exe_path)
+    match asset.download(&mut file, &client).await {
+        Ok(_) => log::info!("Successfully downloaded executable"),
+        Err(e) => {
+            log::error!("Error while downloading new executable: {}", e);
+            return;
+        }
+    };
+
+    log::info!("Spawning new process from newly downloaded executable");
+    match Command::new(exe_path)
+        .args(std::env::args())
+        .arg("--just-updated")
+        .envs(std::env::vars())
+        .spawn()
+    {
+        Ok(child) => {
+            log::info!("Successfully spawned new process: {}", child.id())
+        }
+        Err(e) => {
+            log::error!(
+                "Error while spawning new process from newly downloaded executable: {}",
+                e
+            );
+            return;
+        }
+    };
+
+    log::warn!("Stopping current process to finish update!");
+    std::process::exit(0);
 }
