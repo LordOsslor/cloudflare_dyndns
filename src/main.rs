@@ -31,6 +31,8 @@ struct CliArgs {
 #[tokio::main]
 async fn main() {
     SimpleLogger::new()
+        .with_level(log::LevelFilter::Info)
+        .env()
         .init()
         .expect("Logger should be initializable in main function");
 
