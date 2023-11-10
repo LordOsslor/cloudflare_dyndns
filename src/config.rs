@@ -59,7 +59,7 @@ pub enum RecordType {
 }
 
 #[derive(Serialize, Deserialize, Default, Debug)]
-pub struct SearchCriteria {
+pub struct SearchRule {
     #[serde(flatten, with = "prefix_comment")]
     pub comment: Option<StringMatch>,
     pub content: Option<String>,
@@ -91,7 +91,7 @@ pub struct Zone {
     pub identifier: MaxLenString<32>,
     pub auth: Authorization,
 
-    pub search: Vec<SearchCriteria>,
+    pub search: Vec<SearchRule>,
 }
 
 #[derive(Serialize, Deserialize)]

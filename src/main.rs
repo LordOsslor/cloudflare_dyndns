@@ -79,7 +79,7 @@ async fn main() {
     }
 
     log::info!(
-        "Found configurations for {} zones with {} total search fields",
+        "Found configurations for {} zones with {} total search rules",
         &conf.zones.len(),
         total_search_fields
     );

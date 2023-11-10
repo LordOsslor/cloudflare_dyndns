@@ -27,14 +27,19 @@ pub async fn list_records(
 ) -> Result<Vec<RecordResponse>, Box<dyn std::error::Error>> {
     let mut futures = Vec::new();
 
-    for rule in &zone.search {
+    for (i, rule) in zone.search.iter().enumerate() {
         let client_arc_2 = client_arc.clone();
         futures.push(async move {
+            let url_params = match serde_url_params::to_string(&rule) {
+                Ok(v) => v,
+                Err(e) => Err(format!(
+                    "(Rule {i}): Search rule could not be serialized into url parameters: {e}",
+                ))?,
+            };
+
             let url = format!(
                 "https://api.cloudflare.com/client/v4/zones/{}/dns_records?{}",
-                zone.identifier.0,
-                serde_url_params::to_string(&rule)
-                    .expect("All search rules should be url parsable"),
+                zone.identifier.0, url_params
             );
 
             let mut request = client_arc_2
@@ -52,10 +57,13 @@ pub async fn list_records(
             let result: ListResponse = match status {
                 StatusCode::OK => serde_json::from_str(&text)?,
                 code => Err(format!(
-                    "Response for list records request is of code: {}\nText: {}",
+                    "(Rule {i}): Response for list records request is of code: {}; Text: {}",
                     code, text
                 ))?,
             };
+            if result.result.len() == 0 {
+                Err(format!("(Rule {i}): No records returned for search rule"))?
+            }
             Ok::<ListResponse, Box<dyn std::error::Error>>(result)
         });
     }
@@ -65,7 +73,11 @@ pub async fn list_records(
     for r in results {
         match r {
             Ok(mut r) => record_vec.append(&mut r.result),
-            Err(e) => log::error!("(\"{}\"): Error while patching: {}", zone.identifier, e),
+            Err(e) => log::error!(
+                "(\"{}\"): Error while listing records: {}",
+                zone.identifier,
+                e
+            ),
         }
     }
 
