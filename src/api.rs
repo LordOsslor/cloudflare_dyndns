@@ -23,36 +23,50 @@ fn authenticate_request(req: RequestBuilder, auth: &Authorization) -> RequestBui
 
 pub async fn list_records(
     zone: &config::Zone,
-    client: &reqwest::Client,
+    client_arc: Arc<reqwest::Client>,
 ) -> Result<Vec<RecordResponse>, Box<dyn std::error::Error>> {
-    let mut record_vec = Vec::<RecordResponse>::new();
+    let mut futures = Vec::new();
+
     for rule in &zone.search {
-        let url = format!(
-            "https://api.cloudflare.com/client/v4/zones/{}/dns_records?{}",
-            zone.identifier.0,
-            serde_url_params::to_string(&rule)?
-        );
+        let client_arc_2 = client_arc.clone();
+        futures.push(async move {
+            let url = format!(
+                "https://api.cloudflare.com/client/v4/zones/{}/dns_records?{}",
+                zone.identifier.0,
+                serde_url_params::to_string(&rule)
+                    .expect("All search rules should be url parsable"),
+            );
 
-        let mut request = client
-            .request(Method::GET, url)
-            .header("Content-Type", "application/json");
+            let mut request = client_arc_2
+                .clone()
+                .request(Method::GET, url)
+                .header("Content-Type", "application/json");
 
-        request = authenticate_request(request, &zone.auth);
+            request = authenticate_request(request, &zone.auth);
 
-        let response = request.send().await?;
+            let response = request.send().await?;
 
-        let status = response.status();
-        let text = response.text().await?;
+            let status = response.status();
+            let text = response.text().await?;
 
-        let mut result: ListResponse = match status {
-            StatusCode::OK => serde_json::from_str(&text)?,
-            code => Err(format!(
-                "Response for list records request is of code: {}\nText: {}",
-                code, text
-            ))?,
-        };
+            let result: ListResponse = match status {
+                StatusCode::OK => serde_json::from_str(&text)?,
+                code => Err(format!(
+                    "Response for list records request is of code: {}\nText: {}",
+                    code, text
+                ))?,
+            };
+            Ok::<ListResponse, Box<dyn std::error::Error>>(result)
+        });
+    }
 
-        record_vec.append(&mut result.result);
+    let mut record_vec = Vec::<RecordResponse>::new();
+    let results = join_all(futures).await;
+    for r in results {
+        match r {
+            Ok(mut r) => record_vec.append(&mut r.result),
+            Err(e) => log::error!("(\"{}\"): Error while patching: {}", zone.identifier, e),
+        }
     }
 
     Ok(record_vec)
@@ -187,7 +201,7 @@ pub async fn patch_zone(
     let id = zone.identifier.clone();
 
     log::info!("(\"{id}\"): Listing records");
-    let response_list = match list_records(&zone, &client_arc).await {
+    let response_list = match list_records(&zone, client_arc.clone()).await {
         Ok(v) => v,
         Err(e) => Err(format!("Could not list records for zone \"{}\": {}", id, e))?,
     };
