@@ -84,15 +84,15 @@ async fn main() {
         total_search_fields
     );
 
+    let client = Arc::new(reqwest::Client::new());
     log::info!("Getting ip addresses");
-    let addr = match api::get_ip_addresses(conf.ipv4_service, conf.ipv6_service).await {
-        Ok(v) => v,
-        Err(e) => panic!("Could not get ip addresses: {}", e),
-    };
+    let addr =
+        match api::get_ip_addresses(conf.ipv4_service, conf.ipv6_service, client.clone()).await {
+            Ok(v) => v,
+            Err(e) => panic!("Could not get ip addresses: {}", e),
+        };
 
     log::info!("Got {}", api::address_tuple_to_string(addr));
-
-    let client = Arc::new(reqwest::Client::new());
 
     for zone in conf.zones {
         let id = &zone.identifier.clone();

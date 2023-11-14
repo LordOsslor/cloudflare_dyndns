@@ -154,13 +154,14 @@ pub fn address_tuple_to_string(addresses: (Option<Ipv4Addr>, Option<Ipv6Addr>)) 
 pub async fn get_ip_addresses(
     ipv4_service_url: Option<String>,
     ipv6_service_url: Option<String>,
+    client: Arc<reqwest::Client>,
 ) -> Result<(Option<Ipv4Addr>, Option<Ipv6Addr>), Box<dyn std::error::Error>> {
     if ipv4_service_url.is_none() && ipv6_service_url.is_none() {
         Err("No ip service set")?
     }
 
     let ipv4_addr = if let Some(ipv4_service_url) = ipv4_service_url {
-        let resp4 = reqwest::get(ipv4_service_url).await?;
+        let resp4 = client.get(ipv4_service_url).send().await?;
         match resp4.status() {
             StatusCode::OK => match resp4.text().await?.parse() {
                 Ok(v) => Some(v),
@@ -173,7 +174,7 @@ pub async fn get_ip_addresses(
     };
 
     let ipv6_addr = if let Some(ipv6_service_url) = ipv6_service_url {
-        let resp6 = reqwest::get(ipv6_service_url).await?;
+        let resp6 = client.get(ipv6_service_url).send().await?;
         match resp6.status() {
             StatusCode::OK => match resp6.text().await?.parse() {
                 Ok(v) => Some(v),
