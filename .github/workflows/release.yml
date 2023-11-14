@@ -19,11 +19,6 @@ jobs:
               target: x86_64-unknown-linux-gnu
               ext: 
 
-            - os_name: Linux-AArch64
-              os: self-hosted
-              target: aarch64-unknown-linux-gnu
-              ext:
-
             - os_name: Windows-x86_64
               os: windows-latest
               target: x86_64-pc-windows-msvc
