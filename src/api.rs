@@ -61,7 +61,7 @@ async fn list_records_for_rule(
             code, text
         ))?,
     };
-    if result.result.len() == 0 {
+    if result.result.is_empty() {
         Err(format!("(Rule {i}): No records returned for search rule"))?
     }
 
@@ -171,14 +171,10 @@ pub async fn patch_ip_record_address(
 pub fn address_tuple_to_string(addresses: (Option<Ipv4Addr>, Option<Ipv6Addr>)) -> String {
     match addresses {
         (None, None) => "no addresses".to_owned(),
-        (None, Some(v6)) => format!("{} (IPv6)", v6.to_string()),
-        (Some(v4), None) => format!("{} (IPv4)", v4.to_string()),
+        (None, Some(v6)) => format!("{} (IPv6)", v6),
+        (Some(v4), None) => format!("{} (IPv4)", v4),
         (Some(v4), Some(v6)) => {
-            format!(
-                "both {} (IPv4) and {} (IPv6)",
-                v4.to_string(),
-                v6.to_string()
-            )
+            format!("both {} (IPv4) and {} (IPv6)", v4, v6)
         }
     }
 }
@@ -288,19 +284,19 @@ pub async fn patch_zone(
                 Ok(response) => match response.success {
                     true => {
                         log::info!("(\"{id}\"): ({record_name}): Successfully patched record");
-                        return true;
+                        true
                     }
                     false => {
                         log::error!(
                             "(\"{id}\"): ({record_name}): Patch unsuccessful: {:#?}",
                             response.messages
                         );
-                        return false;
+                        false
                     }
                 },
                 Err(e) => {
                     log::error!("(\"{id}\"): ({record_name}): {}", e);
-                    return false;
+                    false
                 }
             }
         }));

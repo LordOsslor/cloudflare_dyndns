@@ -108,7 +108,7 @@ pub async fn try_update() {
             return;
         }
     };
-    if release.tag_matches(&version) {
+    if release.tag_matches(version) {
         log::info!(
             "Already at latest release tag: {} ~= {}",
             release.tag_name,
@@ -141,10 +141,7 @@ pub async fn try_update() {
         Ok(path) => {
             log::info!(
                 "Got executable path {}",
-                match path.to_str() {
-                    Some(p) => p,
-                    None => "COULD NOT DISPLAY PATH",
-                }
+                path.to_str().unwrap_or("COULD NOT DISPLAY PATH")
             );
             path
         }

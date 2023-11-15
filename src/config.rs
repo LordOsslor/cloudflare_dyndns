@@ -34,7 +34,9 @@ pub enum Order {
     ttl,
     proxied,
 }
+#[warn(clippy::upper_case_acronyms)]
 #[derive(Serialize, Deserialize, Debug)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum RecordType {
     A,
     AAAA,

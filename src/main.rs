@@ -53,10 +53,7 @@ async fn main() {
 
     log::info!(
         "Opening config file at {}",
-        match cli.config.to_str() {
-            Some(v) => v,
-            None => "(Non utf-8 string)",
-        }
+        cli.config.to_str().unwrap_or("(Non utf-8 string)")
     );
     let mut config_file = match File::open(cli.config).await {
         Ok(file) => file,
