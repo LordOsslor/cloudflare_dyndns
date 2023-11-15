@@ -17,7 +17,7 @@ jobs:
             - os_name: Linux-x86_64
               os: ubuntu-20.04
               target: x86_64-unknown-linux-gnu
-              ext: 
+              ext:
 
             - os_name: Windows-x86_64
               os: windows-latest
@@ -27,7 +27,12 @@ jobs:
             - os_name: macOS-x86_64
               os: macOS-latest
               target: x86_64-apple-darwin
-              ext: 
+              ext:
+
+            - os_name: Linux-AArch64
+              os: [self-hosted, linux, ARM64]
+              target: aarch64-unknown-linux-gnu
+              ext:
 
           toolchain:
             - stable
@@ -43,6 +48,8 @@ jobs:
 
       runs-on: ${{ matrix.platform.os }}
       steps:    
+        - name: Update toolchain
+          run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
         - name: Checkout
           uses: actions/checkout@v3
         - name: Cache cargo & target directories
@@ -50,18 +57,17 @@ jobs:
           with:
             shared-key: ${{matrix.platform.target}}
         - name: Build binary
-          uses: houseabsolute/actions-rust-cross@v0
-          with:
-            command: "build"
-            target: ${{ matrix.platform.target }}
-            toolchain: ${{ matrix.toolchain }}
-            args: "--release ${{matrix.feature.arg}}"
-            strip: true
+          run: cargo build --release ${{matrix.feature.arg}}
         - name: Move binary to root folder
           shell: bash
           run: |
-            cp target/${{matrix.platform.target}}/release/dyndns${{matrix.platform.ext}} dyndns${{matrix.feature.modifier}}-${{matrix.platform.target}}${{matrix.platform.ext}}
+            mv target/release/dyndns${{matrix.platform.ext}} dyndns${{matrix.feature.modifier}}-${{matrix.platform.target}}${{matrix.platform.ext}}
         - name: Release
           uses: softprops/action-gh-release@v1
           with:
             files: dyndns-*
+        - name: Upload executable
+          uses: actions/upload-artifact@v3
+          with:
+            name: dyndns${{matrix.feature.modifier}}-${{matrix.platform.target}}${{matrix.platform.ext}}
+            path: target/release/dyndns${{matrix.platform.ext}}
