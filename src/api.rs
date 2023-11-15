@@ -1,11 +1,11 @@
 use std::{
     collections::HashMap,
     net::{Ipv4Addr, Ipv6Addr},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 use crate::{
-    config::{self, Authorization, Zone},
+    config::{self, Authorization, SearchRule, Zone},
     records::{ListResponse, PatchResponse, Record, RecordResponse, TypeSpecificData},
 };
 use futures::future::join_all;
@@ -21,58 +21,84 @@ fn authenticate_request(req: RequestBuilder, auth: &Authorization) -> RequestBui
     }
 }
 
+async fn list_records_for_rule(
+    client_arc: Arc<reqwest::Client>,
+    records: Arc<Mutex<HashMap<String, RecordResponse>>>,
+    i: usize,
+    rule: &SearchRule,
+    zone: &Zone,
+) -> Result<u32, Box<dyn std::error::Error>> {
+    let url_params = match serde_url_params::to_string(&rule) {
+        Ok(v) => v,
+        Err(e) => Err(format!(
+            "(Rule {i}): Search rule could not be serialized into url parameters: {e}",
+        ))?,
+    };
+
+    let url = format!(
+        "https://api.cloudflare.com/client/v4/zones/{}/dns_records?{}",
+        zone.identifier.0, url_params
+    );
+
+    let mut request = client_arc
+        .clone()
+        .request(Method::GET, url)
+        .header("Content-Type", "application/json");
+
+    request = authenticate_request(request, &zone.auth);
+
+    let response = request.send().await?;
+
+    let status = response.status();
+    let text = response.text().await?;
+
+    let result: ListResponse = match status {
+        StatusCode::OK => serde_json::from_str(&text)?,
+        code => Err(format!(
+            "(Rule {i}): Response for list records request is of code: {}; Text: {}",
+            code, text
+        ))?,
+    };
+    if result.result.len() == 0 {
+        Err(format!("(Rule {i}): No records returned for search rule"))?
+    }
+
+    let mut record_lock = records.try_lock().unwrap();
+    let mut new_records = 0;
+    for record in result.result {
+        match record_lock.insert(record.id.to_string(), record) {
+            Some(_) => new_records += 1,
+            None => (),
+        };
+    }
+
+    Ok(new_records)
+}
+
 pub async fn list_records(
     zone: &config::Zone,
     client_arc: Arc<reqwest::Client>,
-) -> Result<Vec<RecordResponse>, Box<dyn std::error::Error>> {
+) -> Result<HashMap<String, RecordResponse>, Box<dyn std::error::Error>> {
     let mut futures = Vec::new();
 
+    let records = Arc::new(Mutex::new(
+        HashMap::<String, RecordResponse>::with_capacity(zone.search.len() * 5),
+    ));
+
     for (i, rule) in zone.search.iter().enumerate() {
-        let client_arc_2 = client_arc.clone();
-        futures.push(async move {
-            let url_params = match serde_url_params::to_string(&rule) {
-                Ok(v) => v,
-                Err(e) => Err(format!(
-                    "(Rule {i}): Search rule could not be serialized into url parameters: {e}",
-                ))?,
-            };
-
-            let url = format!(
-                "https://api.cloudflare.com/client/v4/zones/{}/dns_records?{}",
-                zone.identifier.0, url_params
-            );
-
-            let mut request = client_arc_2
-                .clone()
-                .request(Method::GET, url)
-                .header("Content-Type", "application/json");
-
-            request = authenticate_request(request, &zone.auth);
-
-            let response = request.send().await?;
-
-            let status = response.status();
-            let text = response.text().await?;
-
-            let result: ListResponse = match status {
-                StatusCode::OK => serde_json::from_str(&text)?,
-                code => Err(format!(
-                    "(Rule {i}): Response for list records request is of code: {}; Text: {}",
-                    code, text
-                ))?,
-            };
-            if result.result.len() == 0 {
-                Err(format!("(Rule {i}): No records returned for search rule"))?
-            }
-            Ok::<ListResponse, Box<dyn std::error::Error>>(result)
-        });
+        futures.push(list_records_for_rule(
+            client_arc.clone(),
+            records.clone(),
+            i,
+            rule,
+            zone,
+        ));
     }
 
-    let mut record_vec = Vec::<RecordResponse>::new();
     let results = join_all(futures).await;
     for r in results {
         match r {
-            Ok(mut r) => record_vec.append(&mut r.result),
+            Ok(l) => log::info!("(\"{}\"): Found {} unique records", zone.identifier, l),
             Err(e) => log::error!(
                 "(\"{}\"): Error while listing records: {}",
                 zone.identifier,
@@ -81,7 +107,7 @@ pub async fn list_records(
         }
     }
 
-    Ok(record_vec)
+    Ok(Arc::into_inner(records).unwrap().into_inner().unwrap())
 }
 
 pub async fn patch_ip_record_address(
@@ -214,7 +240,7 @@ pub async fn patch_zone(
     let id = zone.identifier.clone();
 
     log::info!("(\"{id}\"): Listing records");
-    let response_list = match list_records(&zone, client_arc.clone()).await {
+    let mut response_list = match list_records(&zone, client_arc.clone()).await {
         Ok(v) => v,
         Err(e) => Err(format!("Could not list records for zone \"{}\": {}", id, e))?,
     };
@@ -227,7 +253,7 @@ pub async fn patch_zone(
     let mut futures = Vec::with_capacity(response_list.len());
 
     log::info!("(\"{id}\"): Patching records");
-    for record in response_list {
+    for (_record_id, record) in response_list.drain() {
         match ip_type_and_content_match(&record.type_data, addresses)? {
             (true, content) => {
                 log::warn!(
