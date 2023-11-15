@@ -2,8 +2,8 @@ name: Release
 
 on:
   push:
-    # tags:
-    #   - "v*.*.*"
+    tags:
+      - "v*.*.*"
   
 env:
   CARGO_TERM_COLOR: always
@@ -58,14 +58,14 @@ jobs:
             shared-key: ${{matrix.platform.target}}
         - name: Build binary
           run: cargo build --release ${{matrix.feature.arg}}
-        # - name: Move binary to root folder
-        #   shell: bash
-        #   run: |
-        #     cp target/release/dyndns${{matrix.platform.ext}} dyndns${{matrix.feature.modifier}}-${{matrix.platform.target}}${{matrix.platform.ext}}
-        # - name: Release
-        #   uses: softprops/action-gh-release@v1
-        #   with:
-        #     files: dyndns-*
+        - name: Move binary to root folder
+          shell: bash
+          run: |
+            mv target/release/dyndns${{matrix.platform.ext}} dyndns${{matrix.feature.modifier}}-${{matrix.platform.target}}${{matrix.platform.ext}}
+        - name: Release
+          uses: softprops/action-gh-release@v1
+          with:
+            files: dyndns-*
         - name: Upload executable
           uses: actions/upload-artifact@v3
           with:
