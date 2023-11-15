@@ -61,7 +61,7 @@ jobs:
         - name: Move binary to root folder
           shell: bash
           run: |
-            cp target/${{matrix.platform.target}}/release/dyndns${{matrix.platform.ext}} dyndns${{matrix.feature.modifier}}-${{matrix.platform.target}}${{matrix.platform.ext}}
+            cp target/release/dyndns${{matrix.platform.ext}} dyndns${{matrix.feature.modifier}}-${{matrix.platform.target}}${{matrix.platform.ext}}
         - name: Release
           uses: softprops/action-gh-release@v1
           with:
