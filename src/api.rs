@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     net::{Ipv4Addr, Ipv6Addr},
+    str::FromStr,
     sync::{Arc, Mutex},
 };
 
@@ -10,6 +11,7 @@ use crate::{
 };
 use futures::future::join_all;
 use reqwest::{Method, RequestBuilder, StatusCode};
+use tokio::join;
 
 fn authenticate_request(req: RequestBuilder, auth: &Authorization) -> RequestBuilder {
     match auth {
@@ -182,37 +184,34 @@ pub async fn get_ip_addresses(
     ipv6_service_url: Option<String>,
     client: Arc<reqwest::Client>,
 ) -> Result<(Option<Ipv4Addr>, Option<Ipv6Addr>), Box<dyn std::error::Error>> {
-    if ipv4_service_url.is_none() && ipv6_service_url.is_none() {
-        Err("No ip service set")?
+    async fn parse_url<T: FromStr>(
+        url: Option<String>,
+        client: Arc<reqwest::Client>,
+    ) -> Result<Option<T>, Box<dyn std::error::Error>>
+    where
+        <T as FromStr>::Err: std::error::Error,
+        <T as FromStr>::Err: 'static,
+    {
+        match url {
+            Some(url) => {
+                let r = client.get(url).send().await?;
+                match r.status() {
+                    StatusCode::OK => Ok(Some(r.text().await?.parse()?)),
+                    code => Err(format!(
+                        "Received status code {} while getting {}",
+                        code,
+                        std::any::type_name::<T>(),
+                    ))?,
+                }
+            }
+            None => Ok(None),
+        }
     }
-
-    let ipv4_addr = if let Some(ipv4_service_url) = ipv4_service_url {
-        let resp4 = client.get(ipv4_service_url).send().await?;
-        match resp4.status() {
-            StatusCode::OK => match resp4.text().await?.parse() {
-                Ok(v) => Some(v),
-                _ => None,
-            },
-            _ => None,
-        }
-    } else {
-        None
-    };
-
-    let ipv6_addr = if let Some(ipv6_service_url) = ipv6_service_url {
-        let resp6 = client.get(ipv6_service_url).send().await?;
-        match resp6.status() {
-            StatusCode::OK => match resp6.text().await?.parse() {
-                Ok(v) => Some(v),
-                _ => None,
-            },
-            _ => None,
-        }
-    } else {
-        None
-    };
-
-    Ok((ipv4_addr, ipv6_addr))
+    let r = join!(
+        parse_url::<Ipv4Addr>(ipv4_service_url, client.clone()),
+        parse_url::<Ipv6Addr>(ipv6_service_url, client)
+    );
+    Ok((r.0?, r.1?))
 }
 
 fn ip_type_and_content_match(
