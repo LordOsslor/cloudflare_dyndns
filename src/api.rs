@@ -69,8 +69,8 @@ async fn list_records_for_rule(
     let mut new_records = 0;
     for record in result.result {
         match record_lock.insert(record.id.to_string(), record) {
-            Some(_) => new_records += 1,
-            None => (),
+            Some(_) => (),
+            None => new_records += 1,
         };
     }
 
@@ -100,7 +100,11 @@ pub async fn list_records(
     let results = join_all(futures).await;
     for r in results {
         match r {
-            Ok(l) => log::info!("(\"{}\"): Found {} unique records", zone.identifier, l),
+            Ok(l) => log::info!(
+                "(\"{}\"): Got {} new records from record list",
+                zone.identifier,
+                l
+            ),
             Err(e) => log::error!(
                 "(\"{}\"): Error while listing records: {}",
                 zone.identifier,

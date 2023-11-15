@@ -97,7 +97,7 @@ async fn main() {
     for zone in conf.zones {
         let id = &zone.identifier.clone();
         match api::patch_zone(zone, client.clone(), addr).await {
-            Ok(i) => log::info!("/\"{id}\"): Patched {i} records"),
+            Ok(i) => log::info!("(\"{id}\"): Patched {i} records"),
             Err(e) => log::error!("\"{id}\": Fatal error while patching records: {e}"),
         };
     }
