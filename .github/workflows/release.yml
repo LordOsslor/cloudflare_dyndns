@@ -40,7 +40,7 @@ jobs:
           feature:
             - name: default
               modifier:
-              arg: --features default
+              arg:
             - name: no default features
               modifier: -update
               arg: --features update
