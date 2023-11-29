@@ -60,7 +60,7 @@ impl Release {
             let asset_feature_and_target = asset
                 .name
                 .trim_end_matches(".exe")
-                .trim_start_matches("dyndns-");
+                .trim_start_matches("dyndns-update");
 
             if asset_feature_and_target == built_info::TARGET {
                 return Some(asset);

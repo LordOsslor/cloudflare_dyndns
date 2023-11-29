@@ -42,8 +42,8 @@ jobs:
               modifier:
               arg: --features default
             - name: no default features
-              modifier: -no_default
-              arg: --no-default-features
+              modifier: -update
+              arg: --features update
 
 
       runs-on: ${{ matrix.platform.os }}
