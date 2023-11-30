@@ -12,10 +12,10 @@ use tokio::io::AsyncWriteExt;
 use crate::built_info;
 
 const REPO_OWNER: &str = "LordOsslor";
-const REPO_NAME: &str = "dyndns";
 
 const GITHUB_LATEST_RELEASE_URL: &str = const_format::formatcp!(
-    "https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/releases/latest"
+    "https://api.github.com/repos/{REPO_OWNER}/{}/releases/latest",
+    built_info::PKG_NAME
 );
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
