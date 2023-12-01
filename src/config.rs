@@ -105,9 +105,9 @@ pub enum ApiKey {
 impl ApiKey {
     pub fn get_auth_header_tuple(&self) -> (String, String) {
         match self {
-            ApiKey::Email(token) => ("X-Auth-Email".to_owned(), token.to_string()),
-            ApiKey::Key(token) => ("X-Auth-Key".to_owned(), token.to_string()),
-            ApiKey::UserServiceKey(token) => {
+            Self::Email(token) => ("X-Auth-Email".to_owned(), token.to_string()),
+            Self::Key(token) => ("X-Auth-Key".to_owned(), token.to_string()),
+            Self::UserServiceKey(token) => {
                 ("X-Auth-User-Service-Key".to_owned(), token.to_string())
             }
         }

@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use core::fmt::{Display, Formatter};
 
 use serde::{Deserialize, Serialize};
 
@@ -16,12 +16,12 @@ impl<const N: usize> TryFrom<String> for MaxLenString<N> {
                 N
             ))
         } else {
-            Ok(MaxLenString(s))
+            Ok(Self(s))
         }
     }
 }
 impl<const N: usize> Display for MaxLenString<N> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
 }
@@ -40,7 +40,7 @@ impl<const MIN: u16, const MAX: u16> TryFrom<u16> for MinMaxValueU16<MIN, MAX> {
                 i, MIN
             ))
         } else {
-            Ok(MinMaxValueU16(i))
+            Ok(Self(i))
         }
     }
 }
@@ -58,7 +58,7 @@ impl<const MIN: u32, const MAX: u32> TryFrom<u32> for MinMaxValueU32<MIN, MAX> {
                 i, MIN
             ))
         } else {
-            Ok(MinMaxValueU32(i))
+            Ok(Self(i))
         }
     }
 }
@@ -70,8 +70,8 @@ impl TryFrom<u32> for TTLU32 {
     type Error = String;
     fn try_from(v: u32) -> Result<Self, Self::Error> {
         match v {
-            1 => Ok(TTLU32(1)),
-            v if v > 60 && v < 86400 => Ok(TTLU32(v)),
+            1 => Ok(Self(1)),
+            v if v > 60 && v < 86400 => Ok(Self(v)),
             _ => Err("Invalid TTL int")?,
         }
     }

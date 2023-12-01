@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    error::Error,
     net::{Ipv4Addr, Ipv6Addr},
     str::FromStr,
     sync::{Arc, Mutex},
@@ -29,7 +30,7 @@ async fn list_records_for_rule(
     i: usize,
     rule: &SearchRule,
     zone: &Zone,
-) -> Result<u32, Box<dyn std::error::Error>> {
+) -> Result<u32, Box<dyn Error + Sync + Send>> {
     let url_params = match serde_url_params::to_string(&rule) {
         Ok(v) => v,
         Err(e) => Err(format!(
@@ -62,16 +63,17 @@ async fn list_records_for_rule(
         ))?,
     };
     if result.result.is_empty() {
-        Err(format!("(Rule {i}): No records returned for search rule"))?
+        Err(format!("(Rule {i}): No records returned for search rule"))?;
     }
 
-    let mut record_lock = records.try_lock().unwrap();
     let mut new_records = 0;
-    for record in result.result {
-        match record_lock.insert(record.id.to_string(), record) {
-            Some(_) => (),
-            None => new_records += 1,
-        };
+    {
+        let mut record_lock = records.try_lock().unwrap();
+        for record in result.result {
+            if record_lock.insert(record.id.to_string(), record).is_some() {
+                new_records += 1;
+            }
+        }
     }
 
     Ok(new_records)
@@ -80,7 +82,7 @@ async fn list_records_for_rule(
 pub async fn list_records(
     zone: &config::Zone,
     client_arc: Arc<reqwest::Client>,
-) -> Result<HashMap<String, RecordResponse>, Box<dyn std::error::Error>> {
+) -> Result<HashMap<String, RecordResponse>, Box<dyn Error + Sync + Send>> {
     let mut futures = Vec::new();
 
     let records = Arc::new(Mutex::new(
@@ -98,8 +100,8 @@ pub async fn list_records(
     }
 
     let results = join_all(futures).await;
-    for r in results {
-        match r {
+    for future_result in results {
+        match future_result {
             Ok(l) => log::info!(
                 "(\"{}\"): Got {} new records from record list",
                 zone.identifier,
@@ -121,27 +123,27 @@ pub async fn patch_ip_record_address(
     record: Arc<dyn Record + Send + Sync>,
     client: Arc<reqwest::Client>,
     addresses: (Option<Ipv4Addr>, Option<Ipv6Addr>),
-) -> Result<PatchResponse, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<PatchResponse, Box<dyn Error + Send + Sync>> {
     if addresses.0.is_none() && addresses.0.is_none() {
-        Err("No addresses provided")?
+        return Err("No addresses provided".into());
     }
 
     let addr = match &record.get_type_data() {
         TypeSpecificData::A { .. } => match addresses.0 {
-            Some(a) => a.to_string(),
-            None => Err("No ipv4 address found to patch A record")?,
+            Some(a) => Ok(a.to_string()),
+            None => Err("No ipv4 address found to patch A record"),
         },
         TypeSpecificData::AAAA { .. } => match addresses.1 {
-            Some(a) => a.to_string(),
-            None => Err("No ipv6 address found to patch AAAA record")?,
+            Some(a) => Ok(a.to_string()),
+            None => Err("No ipv6 address found to patch AAAA record"),
         },
-        _ => Err("Provided record is not an ip record")?,
-    };
+        _ => Err("Provided record is not an ip record"),
+    }?;
 
     let record_id = match record.get_id() {
-        Some(id) => &id.0,
-        None => Err("Record does not have an id")?,
-    };
+        Some(id) => Ok(&id.0),
+        None => Err("Record does not have an id"),
+    }?;
     let url = format!(
         "https://api.cloudflare.com/client/v4/zones/{}/dns_records/{}",
         zone.identifier, record_id
@@ -165,7 +167,8 @@ pub async fn patch_ip_record_address(
             code,
             &record.get_name().0,
             text
-        ))?,
+        )
+        .into()),
     }
 }
 pub fn address_tuple_to_string(addresses: (Option<Ipv4Addr>, Option<Ipv6Addr>)) -> String {
@@ -183,28 +186,28 @@ pub async fn get_ip_addresses(
     ipv4_service_url: Option<String>,
     ipv6_service_url: Option<String>,
     client: Arc<reqwest::Client>,
-) -> Result<(Option<Ipv4Addr>, Option<Ipv6Addr>), Box<dyn std::error::Error>> {
+) -> Result<(Option<Ipv4Addr>, Option<Ipv6Addr>), Box<dyn Error + Sync + Send>> {
     async fn parse_url<T: FromStr>(
         url: Option<String>,
         client: Arc<reqwest::Client>,
-    ) -> Result<Option<T>, Box<dyn std::error::Error>>
+    ) -> Result<Option<T>, Box<dyn Error + Sync + Send>>
     where
-        <T as FromStr>::Err: std::error::Error,
+        <T as FromStr>::Err: Error + Sync + Send,
         <T as FromStr>::Err: 'static,
     {
-        match url {
-            Some(url) => {
-                let r = client.get(url).send().await?;
-                match r.status() {
-                    StatusCode::OK => Ok(Some(r.text().await?.parse()?)),
-                    code => Err(format!(
-                        "Received status code {} while getting {}",
-                        code,
-                        std::any::type_name::<T>(),
-                    ))?,
-                }
-            }
-            None => Ok(None),
+        if let Some(url) = url {
+            let r = client.get(url).send().await?;
+            return match r.status() {
+                StatusCode::OK => Ok(Some(r.text().await?.parse()?)),
+                code => Err(format!(
+                    "Received status code {} while getting {}",
+                    code,
+                    std::any::type_name::<T>(),
+                )
+                .into()),
+            };
+        } else {
+            return Ok(None);
         }
     }
     let r = join!(
@@ -221,11 +224,11 @@ fn ip_type_and_content_match(
     match type_data {
         TypeSpecificData::A { content, .. } => match addresses.0 {
             Some(a) => Ok((*content == a.to_string(), a.to_string())),
-            None => Err("No ipv4 address found to patch A record")?,
+            None => Err("No ipv4 address found to patch A record"),
         },
         TypeSpecificData::AAAA { content, .. } => match addresses.1 {
             Some(a) => Ok((*content == a.to_string(), a.to_string())),
-            None => Err("No ipv6 address found to patch AAAA record")?,
+            None => Err("No ipv6 address found to patch AAAA record"),
         },
         _ => Err("Provided record is not an ip record"),
     }
@@ -235,7 +238,7 @@ pub async fn patch_zone(
     zone: Zone,
     client_arc: Arc<reqwest::Client>,
     addresses: (Option<Ipv4Addr>, Option<Ipv6Addr>),
-) -> Result<u16, Box<dyn std::error::Error>> {
+) -> Result<u16, Box<dyn Error>> {
     let id = zone.identifier.clone();
 
     log::info!("(\"{id}\"): Listing records");
@@ -281,19 +284,17 @@ pub async fn patch_zone(
             )
             .await
             {
-                Ok(response) => match response.success {
-                    true => {
+                Ok(response) => {
+                    if response.success {
                         log::info!("(\"{id}\"): ({record_name}): Successfully patched record");
-                        true
-                    }
-                    false => {
+                    } else {
                         log::error!(
                             "(\"{id}\"): ({record_name}): Patch unsuccessful: {:#?}",
                             response.messages
                         );
-                        false
-                    }
-                },
+                    };
+                    response.success
+                }
                 Err(e) => {
                     log::error!("(\"{id}\"): ({record_name}): {}", e);
                     false

@@ -1,3 +1,11 @@
+#![warn(
+    clippy::all,
+    clippy::restriction,
+    clippy::pedantic,
+    clippy::nursery,
+    clippy::cargo
+)]
+
 use clap::Parser;
 use core::panic;
 use simple_logger::SimpleLogger;
@@ -72,7 +80,7 @@ async fn main() {
 
     let mut total_search_fields = 0;
     for zone in &conf.zones {
-        total_search_fields += zone.search.len()
+        total_search_fields += zone.search.len();
     }
 
     log::info!(
