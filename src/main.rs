@@ -1,5 +1,5 @@
 use clap::Parser;
-use core::panic;
+use config::Config;
 use simple_logger::SimpleLogger;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -17,6 +17,25 @@ struct CliArgs {
     config: PathBuf,
 }
 
+async fn read_config(config_path: PathBuf) -> Result<Config, String> {
+    log::info!(
+        "Opening config file at {}",
+        config_path.to_str().unwrap_or("(Non utf-8 string)")
+    );
+    let mut config_file = File::open(config_path)
+        .await
+        .or_else(|e| Err(format!("Could not open config file: {e}")))?;
+
+    let mut config_string = String::new();
+    config_file
+        .read_to_string(&mut config_string)
+        .await
+        .or_else(|e| Err(format!("Could not read config file: {e}")))?;
+
+    toml::from_str(&config_string)
+        .or_else(|e| Err(format!("Could not parse config file: {e}").into()))
+}
+
 #[tokio::main]
 async fn main() {
     SimpleLogger::new()
@@ -29,23 +48,12 @@ async fn main() {
     let cli = CliArgs::parse();
     log::debug!("CLI Args: {:?}", cli);
 
-    log::info!(
-        "Opening config file at {}",
-        cli.config.to_str().unwrap_or("(Non utf-8 string)")
-    );
-    let mut config_file = match File::open(cli.config).await {
-        Ok(file) => file,
-        Err(e) => panic!("Could not open config file {}", e),
-    };
-    let mut config_string = String::new();
-    match config_file.read_to_string(&mut config_string).await {
-        Ok(_) => (),
-        Err(e) => panic!("Could not read config file: {}", e),
-    };
-
-    let conf: config::Config = match toml::from_str(&config_string) {
-        Ok(v) => v,
-        Err(e) => panic!("Could not parse config file: {}", e),
+    let conf = match read_config(cli.config).await {
+        Ok(conf) => conf,
+        Err(e) => {
+            log::error!("Error while reading config: {e}");
+            return;
+        }
     };
 
     let mut total_search_fields = 0;
@@ -64,7 +72,10 @@ async fn main() {
     let addr =
         match api::get_ip_addresses(conf.ipv4_service, conf.ipv6_service, client.clone()).await {
             Ok(v) => v,
-            Err(e) => panic!("Could not get ip addresses: {}", e),
+            Err(e) => {
+                log::error!("Could not get ip addresses: {}", e);
+                return;
+            }
         };
 
     log::info!("Got {}", api::address_tuple_to_string(addr));
