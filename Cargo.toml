@@ -1,19 +1,17 @@
 [package]
 name = "cloudflare_dyndns"
+description = "DynDNS client for Cloudflare"
+readme = "README.md"
+repository = "https://github.com/LordOsslor/cloudflare_dyndns"
 version = "0.1.3"
 edition = "2021"
-build = "build.rs"
 authors = ["LordOsslor"]
-
-[features]
-update = []
-
-[build-dependencies]
-built = { version = "0.7", features = ["git2"] }
+license = "BSD-3-Clause"
+keywords = ["ddns", "dyndns", "dynamic-dns", "cloudflare", "dns-records"]
+categories = ["asynchronous","command-line-utilities","web-programming::http-client"]
 
 [dependencies]
 clap = { version = "4.4.7", features = ["derive"] }
-const_format = "0.2.32"
 futures = "0.3.29"
 log = "0.4.20"
 reqwest = { version = "0.11.18", features = ["json", "stream"] }

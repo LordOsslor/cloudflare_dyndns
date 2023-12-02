@@ -10,24 +10,11 @@ mod api;
 mod config;
 mod misc_serialization;
 mod records;
-#[cfg(feature = "update")]
-mod update;
-#[cfg(feature = "update")]
-pub mod built_info {
-    // The file has been placed there by the build script.
-    include!(concat!(env!("OUT_DIR"), "/built.rs"));
-}
 
 #[derive(Parser, Debug)]
 struct CliArgs {
     #[arg(short,long,default_value=clap::builder::OsStr::from("config.toml"))]
     config: PathBuf,
-    #[cfg(feature = "update")]
-    #[arg(short, long)]
-    update: bool,
-    #[cfg(feature = "update")]
-    #[arg(long)]
-    just_updated: bool,
 }
 
 #[tokio::main]
@@ -41,15 +28,6 @@ async fn main() {
     log::debug!("Parsing CLI args");
     let cli = CliArgs::parse();
     log::debug!("CLI Args: {:?}", cli);
-
-    #[cfg(feature = "update")]
-    {
-        log::debug!("Update feature enabled");
-        if cli.update {
-            log::info!("Update cli flag set. Trying to update:");
-            update::try_update().await;
-        }
-    }
 
     log::info!(
         "Opening config file at {}",
