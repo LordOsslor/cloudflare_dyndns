@@ -2,6 +2,7 @@
 name = "cloudflare_dyndns"
 description = "DynDNS client for Cloudflare"
 readme = "README.md"
+homepage = "https://github.com/LordOsslor"
 repository = "https://github.com/LordOsslor/cloudflare_dyndns"
 version = "0.1.3"
 edition = "2021"
