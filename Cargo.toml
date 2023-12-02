@@ -9,6 +9,8 @@ authors = ["LordOsslor"]
 license = "BSD-3-Clause"
 keywords = ["ddns", "dyndns", "dynamic-dns", "cloudflare", "dns-records"]
 categories = ["asynchronous","command-line-utilities","web-programming::http-client"]
+exclude = [".github/*"]
+
 
 [dependencies]
 clap = { version = "4.4.7", features = ["derive"] }
