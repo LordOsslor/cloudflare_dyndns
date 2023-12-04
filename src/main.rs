@@ -38,6 +38,22 @@ async fn read_config(config_path: PathBuf) -> Result<Config, Box<dyn Error>> {
         .or_else(|e| Err(format!("Could not parse config file: {e}").into()))
 }
 
+async fn patch_config(conf: Config) -> Result<(), Box<dyn Error>> {
+    let client = Arc::new(reqwest::Client::new());
+    log::info!("Getting ip addresses");
+
+    let addr = api::get_ip_addresses(conf.ipv4_service, conf.ipv6_service, client.clone()).await?;
+    log::info!("Got {}", api::address_tuple_to_string(addr));
+
+    Ok(for zone in conf.zones {
+        let id = &zone.identifier.clone();
+        match api::patch_zone(zone, client.clone(), addr).await {
+            Ok(i) => log::info!("(\"{id}\"): Patched {i} records"),
+            Err(e) => log::error!("\"{id}\": Error while patching records: {e}"),
+        };
+    })
+}
+
 async fn as_main() -> Result<(), Box<dyn Error>> {
     SimpleLogger::new()
         .with_level(log::LevelFilter::Info)
@@ -62,20 +78,7 @@ async fn as_main() -> Result<(), Box<dyn Error>> {
         total_search_fields
     );
 
-    let client = Arc::new(reqwest::Client::new());
-    log::info!("Getting ip addresses");
-    let addr = api::get_ip_addresses(conf.ipv4_service, conf.ipv6_service, client.clone()).await?;
-
-    log::info!("Got {}", api::address_tuple_to_string(addr));
-
-    for zone in conf.zones {
-        let id = &zone.identifier.clone();
-        match api::patch_zone(zone, client.clone(), addr).await {
-            Ok(i) => log::info!("(\"{id}\"): Patched {i} records"),
-            Err(e) => log::error!("\"{id}\": Error while patching records: {e}"),
-        };
-    }
-    Ok(())
+    patch_config(conf).await
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
