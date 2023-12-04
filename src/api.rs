@@ -237,8 +237,8 @@ pub async fn get_ip_addresses(
     );
 
     match r {
-        (Err(e4), Err(e6)) => {
-            log::error!("Both IPv4 and IPv6 addresses errored: {e4}; {e6}");
+        (Err(_), Err(_)) => {
+            log::error!("Both IPv4 and IPv6 addresses errored");
             Err("No addresses returned".into())
         }
         (r4, r6) => Ok((r4.unwrap_or(None), r6.unwrap_or(None))),
