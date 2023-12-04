@@ -1,4 +1,5 @@
 use std::{
+    any::type_name,
     collections::HashMap,
     error::Error,
     net::{Ipv4Addr, Ipv6Addr},
@@ -10,9 +11,8 @@ use crate::{
     config::{self, Authorization, SearchRule, Zone},
     records::{ListResponse, PatchResponse, Record, RecordResponse, TypeSpecificData},
 };
-use futures::future::join_all;
+use futures::{future::join_all, join};
 use reqwest::{Method, RequestBuilder, StatusCode};
-use tokio::join;
 
 fn authenticate_request(req: RequestBuilder, auth: &Authorization) -> RequestBuilder {
     match auth {
@@ -182,54 +182,80 @@ pub fn address_tuple_to_string(addresses: (Option<Ipv4Addr>, Option<Ipv6Addr>)) 
     }
 }
 
+async fn get_ip_address<T: FromStr>(
+    url_opt: Option<String>,
+    client: Arc<reqwest::Client>,
+) -> Result<Option<T>, Box<dyn Error + Sync + Send>>
+where
+    <T as FromStr>::Err: Error + Sync + Send,
+    <T as FromStr>::Err: 'static,
+{
+    if let Some(url) = url_opt {
+        let ip_version = match type_name::<T>() {
+            "core::net::ip_addr::Ipv4Addr" => "IPv4",
+            "core::net::ip_addr::Ipv6Addr" => "IPv6",
+            t => t,
+        };
+        log::info!("Getting {ip_version} address");
+        let r = client.get(url).send().await.or_else(|e| {
+            log::error!("Error while sending get request for {ip_version}: {e}");
+            Err(e)
+        })?;
+        match r.status() {
+            StatusCode::OK => Ok(Some({
+                let txt = r.text().await.or_else(|e| {
+                    log::error!("Error while reading response for {ip_version}: {e}");
+                    Err(e)
+                })?;
+                txt.parse::<T>().or_else(|e| {
+                    log::error!("Error while parsing response for {ip_version}: {e}");
+                    Err(e)
+                })?
+            })),
+            code => {
+                log::error!(
+                    "Received status code {} while getting {} address",
+                    code,
+                    ip_version
+                );
+                Err("Bad response code".into())
+            }
+        }
+    } else {
+        Ok(None)
+    }
+}
+
 pub async fn get_ip_addresses(
     ipv4_service_url: Option<String>,
     ipv6_service_url: Option<String>,
     client: Arc<reqwest::Client>,
-) -> Result<(Option<Ipv4Addr>, Option<Ipv6Addr>), Box<dyn Error + Sync + Send>> {
-    async fn parse_url<T: FromStr>(
-        url: Option<String>,
-        client: Arc<reqwest::Client>,
-    ) -> Result<Option<T>, Box<dyn Error + Sync + Send>>
-    where
-        <T as FromStr>::Err: Error + Sync + Send,
-        <T as FromStr>::Err: 'static,
-    {
-        if let Some(url) = url {
-            let r = client.get(url).send().await?;
-            return match r.status() {
-                StatusCode::OK => Ok(Some(r.text().await?.parse()?)),
-                code => Err(format!(
-                    "Received status code {} while getting {}",
-                    code,
-                    std::any::type_name::<T>(),
-                )
-                .into()),
-            };
-        } else {
-            return Ok(None);
-        }
-    }
+) -> Result<(Option<Ipv4Addr>, Option<Ipv6Addr>), Box<dyn Error>> {
     let r = join!(
-        parse_url::<Ipv4Addr>(ipv4_service_url, client.clone()),
-        parse_url::<Ipv6Addr>(ipv6_service_url, client)
+        get_ip_address::<Ipv4Addr>(ipv4_service_url, client.clone()),
+        get_ip_address::<Ipv6Addr>(ipv6_service_url, client)
     );
-    Ok((r.0?, r.1?))
+
+    match r {
+        (Err(e4), Err(e6)) => {
+            log::error!("Both IPv4 and IPv6 addresses errored: {e4}; {e6}");
+            Err("No addresses returned".into())
+        }
+        (r4, r6) => Ok((r4.unwrap_or(None), r6.unwrap_or(None))),
+    }
 }
 
 fn ip_type_and_content_match(
-    type_data: &TypeSpecificData,
+    record: Box<&dyn Record>,
     addresses: (Option<Ipv4Addr>, Option<Ipv6Addr>),
-) -> Result<(bool, String), &str> {
-    match type_data {
-        TypeSpecificData::A { content, .. } => match addresses.0 {
-            Some(a) => Ok((*content == a.to_string(), a.to_string())),
-            None => Err("No ipv4 address found to patch A record"),
-        },
-        TypeSpecificData::AAAA { content, .. } => match addresses.1 {
-            Some(a) => Ok((*content == a.to_string(), a.to_string())),
-            None => Err("No ipv6 address found to patch AAAA record"),
-        },
+) -> Result<bool, &'static str> {
+    match record.get_type_data() {
+        TypeSpecificData::A { content, .. } => {
+            Ok(addresses.0.map_or(false, |a| *content == a.to_string()))
+        }
+        TypeSpecificData::AAAA { content, .. } => {
+            Ok(addresses.1.map_or(false, |a| *content == a.to_string()))
+        }
         _ => Err("Provided record is not an ip record"),
     }
 }
@@ -256,16 +282,17 @@ pub async fn patch_zone(
 
     log::info!("(\"{id}\"): Patching records");
     for (_record_id, record) in response_list.drain() {
-        match ip_type_and_content_match(&record.type_data, addresses)? {
-            (true, content) => {
-                log::warn!(
-                    "(\"{id}\"): ({}): Content has not changed, skipping: {}",
-                    record.name,
-                    content
-                );
-                continue;
-            }
-            (false, _) => log::debug!("(\"{id}\"): ({}): Content has changed", record.name),
+        if ip_type_and_content_match(Box::new(&record), addresses)? {
+            log::warn!(
+                "(\"{id}\"): ({}): Content has not changed, skipping",
+                record.name,
+            );
+            continue;
+        } else {
+            log::debug!(
+                "(\"{id}\"): ({}): Content has changed, updating",
+                record.name
+            )
         };
 
         let record_arc: Arc<(dyn Record + Send + Sync)> = Arc::new(record);
