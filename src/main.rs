@@ -12,6 +12,7 @@ mod misc_serialization;
 mod records;
 
 #[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
 struct CliArgs {
     #[arg(short,long,default_value=clap::builder::OsStr::from("config.toml"))]
     config: PathBuf,
