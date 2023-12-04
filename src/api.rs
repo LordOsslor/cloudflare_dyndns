@@ -70,7 +70,7 @@ async fn list_records_for_rule(
     {
         let mut record_lock = records.try_lock().unwrap();
         for record in result.result {
-            if record_lock.insert(record.id.to_string(), record).is_some() {
+            if record_lock.insert(record.id.to_string(), record).is_none() {
                 new_records += 1;
             }
         }
