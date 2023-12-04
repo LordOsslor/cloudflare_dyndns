@@ -102,7 +102,7 @@ pub async fn list_records(
     let results = join_all(futures).await;
     for future_result in results {
         match future_result {
-            Ok(l) => log::info!(
+            Ok(l) => log::debug!(
                 "(\"{}\"): Got {} new records from record list",
                 zone.identifier,
                 l
@@ -268,20 +268,20 @@ pub async fn patch_zone(
     let id = zone.identifier.clone();
 
     log::info!("(\"{id}\"): Listing records");
-    let mut response_list = match list_records(&zone, client_arc.clone()).await {
+    let mut response_map = match list_records(&zone, client_arc.clone()).await {
         Ok(v) => v,
         Err(e) => Err(format!("Could not list records for zone \"{}\": {}", id, e))?,
     };
 
-    log::info!("(\"{id}\"): Received {} responses", response_list.len());
-    log::debug!("(\"{id}\"): Responses: {:?}", response_list);
+    log::info!("(\"{id}\"): Received {} records", response_map.len());
+    log::debug!("(\"{id}\"): Responses: {:?}", response_map);
 
     let zone_arc = Arc::new(zone);
 
-    let mut futures = Vec::with_capacity(response_list.len());
+    let mut futures = Vec::with_capacity(response_map.len());
 
     log::info!("(\"{id}\"): Patching records");
-    for (_record_id, record) in response_list.drain() {
+    for (_record_id, record) in response_map.drain() {
         if ip_type_and_content_match(Box::new(&record), addresses)? {
             log::warn!(
                 "(\"{id}\"): ({}): Content has not changed, skipping",
