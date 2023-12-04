@@ -245,21 +245,6 @@ pub async fn get_ip_addresses(
     }
 }
 
-fn ip_type_and_content_match(
-    record: Box<&dyn Record>,
-    addresses: (Option<Ipv4Addr>, Option<Ipv6Addr>),
-) -> Result<bool, &'static str> {
-    match record.get_type_data() {
-        TypeSpecificData::A { content, .. } => {
-            Ok(addresses.0.map_or(false, |a| *content == a.to_string()))
-        }
-        TypeSpecificData::AAAA { content, .. } => {
-            Ok(addresses.1.map_or(false, |a| *content == a.to_string()))
-        }
-        _ => Err("Provided record is not an ip record"),
-    }
-}
-
 pub async fn patch_zone(
     zone: Zone,
     client_arc: Arc<reqwest::Client>,
@@ -282,18 +267,35 @@ pub async fn patch_zone(
 
     log::info!("(\"{id}\"): Patching records");
     for (_record_id, record) in response_map.drain() {
-        if ip_type_and_content_match(Box::new(&record), addresses)? {
+        if match &record.type_data {
+            TypeSpecificData::A { content, .. } => match addresses.0 {
+                Some(v) => *content == v.to_string(),
+                None => {
+                    log::warn!("(\"{id}\"): ({}): Cannot update record as no IPv4 address is provided, skipping",record.name);
+                    continue;
+                }
+            },
+            TypeSpecificData::AAAA { content, .. } => match addresses.1 {
+                Some(v) => *content == v.to_string(),
+                None => {
+                    log::warn!("(\"{id}\"): ({}): Cannot update record as no IPv6 address is provided, skipping",record.name);
+                    continue;
+                }
+            },
+            _ => {
+                log::warn!(
+                    "(\"{id}\"): ({}): Record is not an IP record, skipping",
+                    record.name
+                );
+                continue;
+            }
+        } {
             log::warn!(
                 "(\"{id}\"): ({}): Content has not changed, skipping",
-                record.name,
+                record.name
             );
             continue;
-        } else {
-            log::debug!(
-                "(\"{id}\"): ({}): Content has changed, updating",
-                record.name
-            )
-        };
+        }
 
         let record_arc: Arc<(dyn Record + Send + Sync)> = Arc::new(record);
         let client_arc_2 = client_arc.clone();
