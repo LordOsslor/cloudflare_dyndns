@@ -54,17 +54,7 @@ async fn patch_config(conf: Config) -> Result<(), Box<dyn Error>> {
     })
 }
 
-async fn as_main() -> Result<(), Box<dyn Error>> {
-    SimpleLogger::new()
-        .with_level(log::LevelFilter::Info)
-        .env()
-        .init()
-        .expect("Logger should be initializable in main function");
-
-    log::debug!("Parsing CLI args");
-    let cli = CliArgs::parse();
-    log::debug!("CLI Args: {:?}", cli);
-
+async fn async_main(cli: CliArgs) -> Result<(), Box<dyn Error>> {
     let conf = read_config(cli.config).await?;
 
     let mut total_search_fields = 0;
@@ -82,9 +72,18 @@ async fn as_main() -> Result<(), Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    SimpleLogger::new()
+        .with_level(log::LevelFilter::Info)
+        .env()
+        .init()
+        .expect("Logger should be initializable in main function");
+
+    log::debug!("Parsing CLI args");
+    let cli = CliArgs::parse();
+    log::debug!("CLI Args: {:?}", cli);
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap()
-        .block_on(as_main())
+        .block_on(async_main(cli))
 }
