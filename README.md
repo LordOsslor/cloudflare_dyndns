@@ -79,7 +79,3 @@ As any record matching either of the two search rules in example above are updat
 - **Match** (either of):
     1. `"any"`
     2. `"all"`
-
-## Experimental automatic update feature:
-Using the update feature allows for the use of the `-u` command line argument which checks the newest release on GitHub.
-If the version of the executable differs from the latest git release, it swaps the binaries and restarts, allowing for a very crude automatic update function.
