@@ -56,18 +56,14 @@ jobs:
           if: ${{ ! contains(matrix.platform.os, 'self-hosted') }}
         - name: Build binary
           run: cargo build --release ${{matrix.feature.arg}}
-        - name: Upload executable
-          uses: actions/upload-artifact@v3
-          with:
-            name: cloudflare_dyndns${{matrix.feature.modifier}}-${{matrix.platform.target}}${{matrix.platform.ext}}
-            path: target/release/cloudflare_dyndns${{matrix.platform.ext}}
         - name: Move binary to root folder
           shell: bash
           run: |
             mv target/release/cloudflare_dyndns${{matrix.platform.ext}} dyndns${{matrix.feature.modifier}}-${{matrix.platform.target}}${{matrix.platform.ext}}
-        - uses: actions/upload-artifact@v3
+        - name: Upload executable
+          uses: actions/upload-artifact@v3
           with:
-            name: ${{matrix.platform.os_name}}
+            name: cloudflare_dyndns${{matrix.feature.modifier}}-${{matrix.platform.target}}${{matrix.platform.ext}}
             path: dyndns-*
         - name: Release
           uses: softprops/action-gh-release@v1
