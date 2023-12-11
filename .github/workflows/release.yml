@@ -67,7 +67,7 @@ jobs:
             mv target/release/cloudflare_dyndns${{matrix.platform.ext}} dyndns${{matrix.feature.modifier}}-${{matrix.platform.target}}${{matrix.platform.ext}}
         - uses: actions/upload-artifact@v3
           with:
-            name: ${{matrix.os_name}}
+            name: ${{matrix.platform.os_name}}
             path: dyndns-*
         - name: Release
           uses: softprops/action-gh-release@v1
