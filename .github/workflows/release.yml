@@ -52,6 +52,7 @@ jobs:
           uses: Swatinem/rust-cache@v2
           with:
             shared-key: ${{matrix.platform.target}}
+          if: ${{ ! contains(matrix.platform.os, 'self-hosted') }}
         - name: Build binary
           run: cargo build --release ${{matrix.feature.arg}}
         - name: Upload executable
