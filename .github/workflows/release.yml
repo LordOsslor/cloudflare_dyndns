@@ -1,10 +1,11 @@
-name: Release
+name
 
 on:
   push:
     tags:
       - "v*.*.*"
-  
+  workflow_dispatch:
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -64,7 +65,12 @@ jobs:
           shell: bash
           run: |
             mv target/release/cloudflare_dyndns${{matrix.platform.ext}} dyndns${{matrix.feature.modifier}}-${{matrix.platform.target}}${{matrix.platform.ext}}
+        - uses: actions/upload-artifact@v3
+          with:
+            name: ${{matrix.os_name}}
+            path: dyndns-*
         - name: Release
           uses: softprops/action-gh-release@v1
           with:
             files: dyndns-*
+          if: startsWith(github.ref, 'refs/tags/')
