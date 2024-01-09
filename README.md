@@ -19,7 +19,7 @@ identifier = "<YOUR ZONE ID HERE>"
 BearerAuth = "<YOUR ZONE AUTHENTICATION HERE>"
 
 # There can be multiple search rules. All records matching any of the rules will be changed
-[[zones.search]] # Updates any A-type record with name "test.mydomain.net"
+[[zones.search]]
 type = "A"
 name = "test.mydomain.net"
 
@@ -27,7 +27,7 @@ name = "test.mydomain.net"
 type = "AAAA"
 ```
 
-As any record matching either of the two search rules in example above are updated, this would mean:
+As any record matching either of the two search rules in example above is updated, this would result in:
 1. The A-Record "test.mydomain.net" will be updated (if it exists)
 2. All AAAA-Records of the zone will be updated
 
