@@ -71,8 +71,8 @@ impl TryFrom<u32> for TTLU32 {
     fn try_from(v: u32) -> Result<Self, Self::Error> {
         match v {
             1 => Ok(Self(1)),
-            v if v > 60 && v < 86400 => Ok(Self(v)),
-            _ => Err("Invalid TTL int")?,
+            v if v >= 30 && v <= 86400 => Ok(Self(v)),
+            _ => Err(format!("Invalid TTL int: {v}"))?,
         }
     }
 }
