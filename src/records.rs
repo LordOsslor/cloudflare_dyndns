@@ -148,9 +148,11 @@ pub trait Record {
     fn get_name(&self) -> &MaxLenString<255>;
     fn get_id(&self) -> Option<&MaxLenString<32>>;
 
+    #[allow(dead_code)]
     fn get_comment(&self) -> &Option<String>;
-
+    #[allow(dead_code)]
     fn get_tags(&self) -> &Option<Vec<String>>;
+    #[allow(dead_code)]
     fn get_ttl(&self) -> &Option<TTLU32>;
 }
 
@@ -166,7 +168,7 @@ pub struct RecordResponse {
     pub created_on: String,
     pub id: MaxLenString<32>,
     #[serde(skip_serializing)]
-    pub locked: bool,
+    pub locked: Option<bool>,
     #[serde(skip_serializing)]
     pub meta: Option<Meta>,
     #[serde(skip_serializing)]
