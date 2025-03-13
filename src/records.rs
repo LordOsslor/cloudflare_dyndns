@@ -179,7 +179,7 @@ pub struct RecordResponse {
     pub tags: Option<Vec<String>>,
     pub ttl: Option<TTLU32>,
     pub zone_id: Option<MaxLenString<32>>,
-    pub zone_name: String,
+    pub zone_name: Option<String>,
 }
 impl Record for RecordResponse {
     fn get_comment(&self) -> &Option<String> {
